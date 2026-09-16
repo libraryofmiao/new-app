@@ -84,7 +84,12 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun loadLogo() = assets.open("miao_logo_base64.txt").use { stream -> val bytes = Base64.decode(stream.bufferedReader().readText(), Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+    private fun loadLogo() = runCatching {
+        assets.open("miao_logo_base64.txt").use { stream ->
+            val bytes = Base64.decode(stream.bufferedReader().readText(), Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }
+    }.getOrNull()
 
     private fun showHome() {
         isHomeScreen = true
