@@ -32,10 +32,12 @@
 <script>
 const API='https://api.miaolibrary.in';
 const $=id=>document.getElementById(id);
-let items=[];let editingId=null;
+let items=[];let editingId=null;let adminToken=sessionStorage.getItem('cms_admin_token')||'';
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function setStatus(el,msg,error=false){el.textContent=msg;el.className='status '+(error?'error':'success')}
-async function api(path,options={}){options.credentials='include';options.headers=Object.assign({'Content-Type':'application/json'},options.headers||{});const r=await fetch(API+path,options);let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.detail||('Request failed ('+r.status+')'));return data}
+async function api(path,options={}){options.headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(adminToken)options.headers['Authorization']='Bearer '+adminToken;const r=await fetch(API+path,options);let data={};try{data=await r.json()}catch{}if(!r.ok){const err=new Error(data.detail||('Request failed ('+r.status+')'));err.status=r.status;throw err}return data}
+function clearAdminToken(){sessionStorage.removeItem('cms_admin_token');adminToken=''}
+function handleAuthError(e){if(e.status===401){clearAdminToken();showLogin();setStatus($('loginStatus'),'Session expired. Please sign in again.',true);return true}return false}
 function showApp(){ $('loginCard').hidden=true;$('appCard').hidden=false;$('editorCard').hidden=false;$('previewCard').hidden=false;loadItems() }
 function showLogin(){ $('loginCard').hidden=false;$('appCard').hidden=true;$('editorCard').hidden=true;$('previewCard').hidden=true }
 function current(){return {content_type:$('type').value,title:$('title').value.trim(),body_html:$('html').value.trim()||$('body').value.trim(),image_url:$('image').value.trim(),start_at:$('publishedAt').value,end_at:$('expiresAt').value,notification_enabled:$('notify').checked,published:$('published').checked,display_order:Number($('order').value||0)}}
@@ -44,14 +46,14 @@ function resetForm(){editingId=null;$('editorTitle').textContent='Create an upda
 function editItem(x){editingId=x.id;$('editorTitle').textContent='Edit update';$('saveButton').textContent='Save changes';$('type').value=x.type;$('title').value=x.title;$('body').value=x.body_html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();$('html').value=x.body_html;$('image').value=x.image_url;$('publishedAt').value=x.start_at;$('expiresAt').value=x.end_at;$('notify').checked=x.notification_enabled;$('published').checked=x.published;$('order').value=x.display_order;preview();window.scrollTo({top:0,behavior:'smooth'})}
 function render(){items.sort((a,b)=>a.display_order-b.display_order);$('list').innerHTML=items.length?items.map(x=>'<div class="item"><h3>'+esc(x.title)+'</h3><p>'+esc(x.body_html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim())+'</p><small>'+esc(x.type)+' · '+(x.published?'Published':'Draft')+' · Order '+x.display_order+'</small><div class="item-actions"><button class="secondary" onclick="editItemById(\''+esc(x.id)+'\')">Edit</button><button class="danger" onclick="deleteItem(\''+esc(x.id)+'\')">Delete</button></div></div>').join(''):'<div class="empty">No saved updates yet.</div>'}
 window.editItemById=id=>{let x=items.find(i=>i.id===id);if(x)editItem(x)};
-window.deleteItem=async id=>{if(!confirm('Delete this CMS item permanently?'))return;try{await api('/cms/admin/content/'+encodeURIComponent(id),{method:'DELETE'});await loadItems();if(editingId===id)resetForm()}catch(e){setStatus($('appStatus'),e.message,true)}};
-async function loadItems(){try{let data=await api('/cms/admin/content');items=data.items||[];render();setStatus($('appStatus'),'Signed in · '+items.length+' item(s) loaded.')}catch(e){showLogin();setStatus($('loginStatus'),e.message,true)}}
-$('loginForm').addEventListener('submit',async e=>{e.preventDefault();setStatus($('loginStatus'),'Signing in...');try{await api('/cms/admin/login',{method:'POST',body:JSON.stringify({username:$('loginUser').value,password:$('loginPass').value})});$('loginPass').value='';showApp()}catch(err){setStatus($('loginStatus'),err.message,true)}});
-$('logout').onclick=async()=>{try{await api('/cms/admin/logout',{method:'POST'});items=[];resetForm();showLogin();setStatus($('loginStatus'),'Signed out.')}catch(e){setStatus($('appStatus'),e.message,true)}};
+window.deleteItem=async id=>{if(!confirm('Delete this CMS item permanently?'))return;try{await api('/cms/admin/content/'+encodeURIComponent(id),{method:'DELETE'});await loadItems();if(editingId===id)resetForm()}catch(e){if(!handleAuthError(e))setStatus($('appStatus'),e.message,true)}};
+async function loadItems(){try{let data=await api('/cms/admin/content');items=data.items||[];render();setStatus($('appStatus'),'Signed in · '+items.length+' item(s) loaded.')}catch(e){if(!handleAuthError(e)){showLogin();setStatus($('loginStatus'),e.message,true)}}}
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();setStatus($('loginStatus'),'Signing in...');try{const data=await api('/cms/admin/login',{method:'POST',body:JSON.stringify({username:$('loginUser').value,password:$('loginPass').value})});adminToken=data.access_token||'';if(!adminToken)throw new Error('Administrator session token was not returned');sessionStorage.setItem('cms_admin_token',adminToken);$('loginPass').value='';showApp()}catch(err){setStatus($('loginStatus'),err.message,true)}});
+$('logout').onclick=async()=>{try{await api('/cms/admin/logout',{method:'POST'});clearAdminToken();items=[];resetForm();showLogin();setStatus($('loginStatus'),'Signed out.')}catch(e){if(e.status===401){clearAdminToken();items=[];resetForm();showLogin();setStatus($('loginStatus'),'Signed out.')}else setStatus($('appStatus'),e.message,true)}};
 $('form').addEventListener('input',preview);
-$('form').addEventListener('submit',async e=>{e.preventDefault();let x=current();if(!x.title){setStatus($('appStatus'),'Title is required.',true);return}try{let data;if(editingId)data=await api('/cms/admin/content/'+encodeURIComponent(editingId),{method:'PUT',body:JSON.stringify(x)});else data=await api('/cms/admin/content',{method:'POST',body:JSON.stringify(x)});setStatus($('appStatus'),editingId?'Update saved.':'Update created.');resetForm();await loadItems()}catch(err){setStatus($('appStatus'),err.message,true)}});
+$('form').addEventListener('submit',async e=>{e.preventDefault();let x=current();if(!x.title){setStatus($('appStatus'),'Title is required.',true);return}try{let data;if(editingId)data=await api('/cms/admin/content/'+encodeURIComponent(editingId),{method:'PUT',body:JSON.stringify(x)});else data=await api('/cms/admin/content',{method:'POST',body:JSON.stringify(x)});setStatus($('appStatus'),editingId?'Update saved.':'Update created.');resetForm();await loadItems()}catch(err){if(!handleAuthError(err))setStatus($('appStatus'),err.message,true)}});
 $('clear').onclick=resetForm;
-showLogin();preview();
+if(adminToken)showApp();else showLogin();preview();
 </script>
 </body>
 </html>
