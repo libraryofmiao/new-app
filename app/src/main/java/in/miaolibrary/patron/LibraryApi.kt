@@ -3,10 +3,13 @@ package in.miaolibrary.patron
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 private const val GATEWAY_URL = "https://api.miaolibrary.in"
 
-data class Book(val title: String, val author: String, val dueDate: String, val callNumber: String, val status: String)
+data class Book(val title: String, val author: String, val dueDate: String, val callNumber: String, val status: String, val detailsUrl: String = "")
+data class HistoryRecord(val title: String, val author: String, val date: String, val callNumber: String, val status: String)
+data class CatalogueItem(val biblionumber: Int, val title: String, val author: String, val library: String, val callNumber: String, val availability: String, val holdingCount: Int)
 
 class LibraryApi {
     fun login(username: String, password: String): Result<String> {
@@ -22,7 +25,30 @@ class LibraryApi {
         buildList {
             for (index in 0 until array.length()) {
                 val item = array.optJSONObject(index) ?: continue
-                add(Book(item.optString("title", "Untitled"), item.optString("author"), item.optString("due_date"), item.optString("call_number"), item.optString("status", "checked_out")))
+                add(Book(item.optString("title", "Untitled"), item.optString("author"), item.optString("due_date"), item.optString("call_number"), item.optString("status", "checked_out"), item.optString("details_url")))
+            }
+        }
+    }
+
+    fun issueHistory(token: String): Result<List<HistoryRecord>> = request("/issue-history", token, "GET", null).map { json ->
+        val array = json.optJSONArray("records") ?: return@map emptyList()
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                add(HistoryRecord(item.optString("title", "Untitled"), item.optString("author"), item.optString("date"), item.optString("call_number"), item.optString("status")))
+            }
+        }
+    }
+
+    fun catalogueSearch(token: String, query: String): Result<List<CatalogueItem>> {
+        val encoded = URLEncoder.encode(query, Charsets.UTF_8.name())
+        return request("/catalogue/search?q=$encoded", token, "GET", null).map { json ->
+            val array = json.optJSONArray("results") ?: return@map emptyList()
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    add(CatalogueItem(item.optInt("biblionumber"), item.optString("title", "Untitled"), item.optString("author"), item.optString("library"), item.optString("call_number"), item.optString("availability"), item.optInt("holding_count")))
+                }
             }
         }
     }
@@ -45,7 +71,7 @@ class LibraryApi {
         val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         val json = runCatching { JSONObject(text) }.getOrNull()
         if (code in 200..299 && json != null) Result.success(json)
-        else Result.failure(Exception("HTTP $code: " + (json?.optString("detail").orEmpty().ifBlank { "Server error" })))
+        else Result.failure(Exception(json?.optString("detail").orEmpty().ifBlank { "Server error ($code)" }))
     } catch (error: Exception) {
         Result.failure(error)
     }
