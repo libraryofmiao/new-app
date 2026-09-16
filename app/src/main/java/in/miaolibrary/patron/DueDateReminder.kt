@@ -1,13 +1,13 @@
 package in.miaolibrary.patron
 
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import androidx.core.app.NotificationCompat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -71,12 +71,16 @@ class DueDateReminderReceiver : BroadcastReceiver() {
         val dueDate = intent.getStringExtra("due_date").orEmpty()
         val message = if (dueDate.isBlank()) "This book is due today." else "This book is due today ($dueDate)."
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notification = NotificationCompat.Builder(context, MiaoLibraryApplication.DUE_DATE_NOTIFICATION_CHANNEL)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(context, MiaoLibraryApplication.DUE_DATE_NOTIFICATION_CHANNEL)
+        } else {
+            Notification.Builder(context)
+        }
+        val notification = builder
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Book due today")
             .setContentText("$title — $message")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$title\n$message"))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setStyle(Notification.BigTextStyle().bigText("$title\n$message"))
             .setAutoCancel(true)
             .build()
         manager.notify((title.hashCode() and 0x7fffffff), notification)
