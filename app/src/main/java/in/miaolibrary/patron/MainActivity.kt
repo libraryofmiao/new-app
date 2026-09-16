@@ -1,11 +1,14 @@
 package in.miaolibrary.patron
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.view.Gravity
@@ -29,6 +32,7 @@ import android.security.keystore.KeyProperties
 private const val KEYSTORE = "AndroidKeyStore"
 private const val KEY_ALIAS = "miao_library_session_key"
 private const val PREFS = "miao_library_secure_session"
+private const val NOTIFICATION_PERMISSION_REQUEST = 1001
 
 class MainActivity : Activity() {
     private lateinit var root: LinearLayout
@@ -40,8 +44,15 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        prepareNotificationPermission()
         val token = session.readToken()
         if (token.isNullOrBlank()) showLogin() else { currentToken = token; showHome() }
+    }
+
+    private fun prepareNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+        }
     }
 
     override fun onBackPressed() {
@@ -74,12 +85,12 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply { text = "Miao Library"; textSize = 28f; typeface = Typeface.DEFAULT_BOLD }, matchWrap())
         root.addView(TextView(this).apply { text = "Your library account"; textSize = 15f; setTextColor(Color.DKGRAY); setPadding(0, 4, 0, 8) }, matchWrap())
         val navigation = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 14, 0, 12) }
-        val myBooksButton = Button(this).apply { text = "My Books" }; val historyButton = Button(this).apply { text = "History" }; val catalogueButton = Button(this).apply { text = "Catalogue" }
-        navigation.addView(myBooksButton, weightWrap()); navigation.addView(historyButton, weightWrap()); navigation.addView(catalogueButton, weightWrap()); root.addView(navigation, matchWrap())
+        val myBooksButton = Button(this).apply { text = "My Books" }; val catalogueButton = Button(this).apply { text = "Catalogue" }
+        navigation.addView(myBooksButton, weightWrap()); navigation.addView(catalogueButton, weightWrap()); root.addView(navigation, matchWrap())
         val accountButton = Button(this).apply { text = "Account"; setOnClickListener { showAccount() } }; root.addView(accountButton, matchWrap())
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 4, 0, 8) }; root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         root.addView(Button(this).apply { text = "Log out"; setOnClickListener { session.clearToken(); currentToken = null; showLogin() } }, matchWrap()); setContentView(root)
-        myBooksButton.setOnClickListener { loadMyBooks() }; historyButton.setOnClickListener { loadHistory() }; catalogueButton.setOnClickListener { showCatalogueSearch() }; loadMyBooks()
+        myBooksButton.setOnClickListener { loadMyBooks() }; catalogueButton.setOnClickListener { showCatalogueSearch() }; loadMyBooks()
     }
 
     private fun showAccount() {
@@ -87,14 +98,16 @@ class MainActivity : Activity() {
         Thread { val result = api.account(token); runOnUiThread { if (result.isSuccess) { val account = result.getOrThrow(); content.removeAllViews(); content.addView(Button(this).apply { text = "Back"; setOnClickListener { val action = detailsBack; detailsBack = null; action?.invoke() } }); content.addView(sectionHeader("Account", "Your registered library details")); val name = listOf(account.firstName, account.surname).filter { it.isNotBlank() }.joinToString(" "); val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addRowIfPresent(this, "Name", name); addRowIfPresent(this, "Username", account.username); addRowIfPresent(this, "Library card number", account.cardNumber); addRowIfPresent(this, "Email", account.email); addRowIfPresent(this, "Phone", account.phone); addRowIfPresent(this, "Address", account.address) }; content.addView(styledContainer(card)) } else handleFailure(result.exceptionOrNull()) } }.start()
     }
 
+    private fun historyButton() = Button(this).apply { text = "View Issue History"; setOnClickListener { loadHistory() } }
+
     private fun loadMyBooks() {
-        content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); content.addView(label("Loading your books…", 16f)); val token = currentToken ?: return
-        Thread { val result = api.myBooks(token); runOnUiThread { if (result.isSuccess) { content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); val books = result.getOrThrow(); if (books.isEmpty()) content.addView(emptyState("You have no books currently issued.")) else books.forEach { book -> val id = extractBiblionumber(book.detailsUrl); val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(book.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(book.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Due date", book.dueDate.ifBlank { "Not available" })); addView(detailRow("Call number", book.callNumber.ifBlank { "Not available" })) }; content.addView(if (id != null) clickableContainer(item) { showBookDetails(id) { loadMyBooks() } } else styledContainer(item)) } } else handleFailure(result.exceptionOrNull()) } }.start()
+        content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); content.addView(historyButton()); content.addView(label("Loading your books…", 16f)); val token = currentToken ?: return
+        Thread { val result = api.myBooks(token); runOnUiThread { if (result.isSuccess) { content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); content.addView(historyButton()); val books = result.getOrThrow(); if (books.isEmpty()) content.addView(emptyState("You have no books currently issued.")) else books.forEach { book -> val id = extractBiblionumber(book.detailsUrl); val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(book.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(book.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Due date", book.dueDate.ifBlank { "Not available" })); addView(detailRow("Call number", book.callNumber.ifBlank { "Not available" })) }; content.addView(if (id != null) clickableContainer(item) { showBookDetails(id) { loadMyBooks() } } else styledContainer(item)) } } else handleFailure(result.exceptionOrNull()) } }.start()
     }
 
     private fun loadHistory() {
-        content.removeAllViews(); content.addView(sectionHeader("Issue History", "Previously issued books")); content.addView(label("Loading history…", 16f)); val token = currentToken ?: return
-        Thread { val result = api.issueHistory(token); runOnUiThread { if (result.isSuccess) { content.removeAllViews(); content.addView(sectionHeader("Issue History", "Previously issued books")); val records = result.getOrThrow(); if (records.isEmpty()) content.addView(emptyState("No previous issues found.")) else records.forEach { record -> val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(record.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(record.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Date", record.date.ifBlank { "Not available" })); addView(detailRow("Call number", record.callNumber.ifBlank { "Not available" })); addView(detailRow("Status", record.status.ifBlank { "Not available" })) }; content.addView(styledContainer(item)) } } else handleFailure(result.exceptionOrNull()) } }.start()
+        content.removeAllViews(); content.addView(sectionHeader("Issue History", "Previously issued books")); content.addView(Button(this).apply { text = "Back to My Books"; setOnClickListener { loadMyBooks() } }); content.addView(label("Loading history…", 16f)); val token = currentToken ?: return
+        Thread { val result = api.issueHistory(token); runOnUiThread { if (result.isSuccess) { content.removeAllViews(); content.addView(sectionHeader("Issue History", "Previously issued books")); content.addView(Button(this).apply { text = "Back to My Books"; setOnClickListener { loadMyBooks() } }); val records = result.getOrThrow(); if (records.isEmpty()) content.addView(emptyState("No previous issues found.")) else records.forEach { record -> val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(record.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(record.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Date", record.date.ifBlank { "Not available" })); addView(detailRow("Call number", record.callNumber.ifBlank { "Not available" })); addView(detailRow("Status", record.status.ifBlank { "Not available" })) }; content.addView(styledContainer(item)) } } else handleFailure(result.exceptionOrNull()) } }.start()
     }
 
     private fun showCatalogueSearch() {
