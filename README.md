@@ -58,6 +58,6 @@ The app schedules a local reminder for each parsed checkout due date when the ac
 
 ## Build
 
-GitHub Actions builds the debug APK with JDK 17 and Gradle 9.4. The workflow uploads `app-debug.apk` as a build artifact.
+GitHub Actions builds the debug APK with JDK 17 and Gradle 9.7.0. The workflow uploads `app-debug.apk` as a build artifact.
 
 The project uses Kotlin, Android Views, compile SDK 36, minimum SDK 26, and Java 17 compatibility.
