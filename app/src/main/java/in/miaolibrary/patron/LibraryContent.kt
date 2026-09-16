@@ -3,13 +3,6 @@ package in.miaolibrary.patron
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Content contract for the future library CMS feed.
- *
- * The Android client keeps this model independent from the CMS implementation so
- * the gateway can later expose announcements, events, advertisements, HTML,
- * image previews, and additional library logos without changing screen models.
- */
 data class LibraryContentItem(
     val id: String,
     val type: ContentType,
@@ -19,7 +12,9 @@ data class LibraryContentItem(
     val html: String,
     val publishedAt: String,
     val expiresAt: String,
-    val sortOrder: Int
+    val sortOrder: Int,
+    val notificationEnabled: Boolean,
+    val logoUrl: String
 )
 
 enum class ContentType {
@@ -54,7 +49,9 @@ object LibraryContentParser {
                         html = item.optString("html"),
                         publishedAt = item.optString("published_at", item.optString("start_at")),
                         expiresAt = item.optString("expires_at", item.optString("end_at")),
-                        sortOrder = item.optInt("sort_order", index)
+                        sortOrder = item.optInt("sort_order", index),
+                        notificationEnabled = item.optBoolean("notification_enabled", false),
+                        logoUrl = item.optString("logo_url", item.optString("logo"))
                     )
                 )
             }
