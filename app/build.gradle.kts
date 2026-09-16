@@ -6,15 +6,13 @@ plugins {
 
 android {
     namespace = "in.miaolibrary.patron"
-    // Use a commonly available Android SDK in Codespaces/CI.
-    // SDK 36 may not be installed in the build environment and causes
-    // "Android SDK not available" / "Failed to find target" errors.
-    compileSdk = 35
+    // SDK 34 is widely available in Codespaces and local Android toolchains.
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "in.miaolibrary.patron"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
     }
