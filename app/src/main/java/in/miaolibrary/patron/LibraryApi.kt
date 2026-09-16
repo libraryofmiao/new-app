@@ -45,7 +45,7 @@ class LibraryApi {
         val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         val json = runCatching { JSONObject(text) }.getOrNull()
         if (code in 200..299 && json != null) Result.success(json)
-        else Result.failure(Exception(json?.optString("detail").orEmpty().ifBlank { "Server error ($code)" }))
+        else Result.failure(Exception("HTTP $code: " + (json?.optString("detail").orEmpty().ifBlank { "Server error" })))
     } catch (error: Exception) {
         Result.failure(error)
     }
