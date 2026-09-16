@@ -1,4 +1,4 @@
-package in.miaolibrary.patron
+package `in`.miaolibrary.patron
 
 import android.Manifest
 import android.app.Activity
@@ -68,8 +68,8 @@ class MainActivity : Activity() {
         root.addView(ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER; setImageBitmap(loadLogo()) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 230))
         root.addView(TextView(this).apply { text = "Miao Library"; textSize = 28f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER }, matchWrap())
         root.addView(TextView(this).apply { text = "Sign in with your library account"; textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 12, 0, 28) }, matchWrap())
-        val username = EditText(this).apply { hint = "Username"; singleLine = true; inputType = InputType.TYPE_CLASS_TEXT }
-        val password = EditText(this).apply { hint = "Password"; singleLine = true; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD; transformationMethod = PasswordTransformationMethod.getInstance() }
+        val username = EditText(this).apply { hint = "Username"; setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT }
+        val password = EditText(this).apply { hint = "Password"; setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD; transformationMethod = PasswordTransformationMethod.getInstance() }
         val toggle = Button(this).apply { text = "Show" }
         var visible = false
         toggle.setOnClickListener { visible = !visible; password.transformationMethod = if (visible) HideReturnsTransformationMethod.getInstance() else PasswordTransformationMethod.getInstance(); password.setSelection(password.text.length); toggle.text = if (visible) "Hide" else "Show" }
@@ -77,7 +77,11 @@ class MainActivity : Activity() {
         val loginButton = Button(this).apply { text = "Sign in" }
         val status = TextView(this).apply { textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.DKGRAY); setPadding(0, 20, 0, 0) }
         loginButton.setOnClickListener { val user = username.text.toString().trim(); val pass = password.text.toString(); if (user.isEmpty() || pass.isEmpty()) { status.text = "Enter your username and password."; return@setOnClickListener }; loginButton.isEnabled = false; status.text = "Signing in…"; Thread { val result = api.login(user, pass); runOnUiThread { if (result.isSuccess) { val token = result.getOrThrow(); session.saveToken(token); currentToken = token; showHome() } else { loginButton.isEnabled = true; status.text = result.exceptionOrNull()?.message ?: "Unable to sign in." } } }.start() }
-        root.addView(username, matchWrap()); root.addView(passwordRow, matchWrap()); root.addView(loginButton, matchWrap()); root.addView(status, matchWrap()); setContentView(root)
+        root.addView(username, matchWrap()); root.addView(passwordRow, matchWrap()); root.addView(loginButton, matchWrap()); root.addView(status, matchWrap())
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(root)
+        })
     }
 
     private fun loadLogo() = assets.open("miao_logo_base64.txt").use { stream -> val bytes = Base64.decode(stream.bufferedReader().readText(), Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
@@ -160,7 +164,7 @@ class MainActivity : Activity() {
 
     private fun showCatalogueSearch() {
         isHomeScreen = false
-        detailsBack = null; content.removeAllViews(); content.addView(sectionHeader("Catalogue", "Search the library collection")); val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; val query = EditText(this).apply { hint = "Search books"; singleLine = true }; val searchButton = Button(this).apply { text = "Search" }; searchRow.addView(query, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); searchRow.addView(searchButton, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)); content.addView(searchRow, matchWrap()); val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; content.addView(results, matchWrap())
+        detailsBack = null; content.removeAllViews(); content.addView(sectionHeader("Catalogue", "Search the library collection")); val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; val query = EditText(this).apply { hint = "Search books"; setSingleLine(true) }; val searchButton = Button(this).apply { text = "Search" }; searchRow.addView(query, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); searchRow.addView(searchButton, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)); content.addView(searchRow, matchWrap()); val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; content.addView(results, matchWrap())
         searchButton.setOnClickListener { val text = query.text.toString().trim(); if (text.isEmpty()) { results.removeAllViews(); results.addView(label("Enter a search term.", 16f)); return@setOnClickListener }; searchButton.isEnabled = false; results.removeAllViews(); results.addView(label("Searching…", 16f)); val token = currentToken ?: return@setOnClickListener; Thread { val result = api.catalogueSearch(token, text); runOnUiThread { searchButton.isEnabled = true; results.removeAllViews(); if (result.isSuccess) { val items = result.getOrThrow(); if (items.isEmpty()) results.addView(emptyState("No catalogue results found.")) else items.forEach { item -> val view = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(item.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(item.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Library", item.library.ifBlank { "Not available" })); addView(detailRow("Call number", item.callNumber.ifBlank { "Not available" })); addView(detailRow("Availability", item.availability.ifBlank { "Not available" })); addView(detailRow("Copies", item.holdingCount.toString())) }; results.addView(clickableContainer(view) { showBookDetails(item.biblionumber) { showCatalogueSearch() } }) } } else handleFailure(result.exceptionOrNull()) } }.start() }
     }
 
