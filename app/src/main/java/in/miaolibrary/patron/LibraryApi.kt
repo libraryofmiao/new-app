@@ -12,6 +12,7 @@ data class HistoryRecord(val title: String, val author: String, val date: String
 data class CatalogueItem(val biblionumber: Int, val title: String, val author: String, val library: String, val callNumber: String, val availability: String, val holdingCount: Int)
 data class Holding(val itemType: String, val currentLibrary: String, val homeLibrary: String, val collection: String, val shelvingLocation: String, val callNumber: String, val materialsSpecified: String, val volumeInfo: String, val copyNumber: String, val status: String, val notes: String, val dateDue: String, val barcode: String)
 data class BookDetails(val biblionumber: Int, val title: String, val author: String, val holdings: List<Holding>)
+data class AccountInfo(val username: String, val cardNumber: String, val firstName: String, val surname: String, val email: String, val phone: String, val address: String)
 
 class LibraryApi {
     fun login(username: String, password: String): Result<String> {
@@ -20,6 +21,18 @@ class LibraryApi {
             json.optString("access_token").takeIf { it.isNotBlank() }
                 ?: throw Exception("Login response did not contain an access token")
         }
+    }
+
+    fun account(token: String): Result<AccountInfo> = request("/account", token, "GET", null).map { json ->
+        AccountInfo(
+            username = json.optString("username"),
+            cardNumber = json.optString("cardnumber", json.optString("card_number")),
+            firstName = json.optString("firstname", json.optString("first_name")),
+            surname = json.optString("surname", json.optString("last_name")),
+            email = json.optString("email"),
+            phone = json.optString("phone", json.optString("mobile")),
+            address = json.optString("address", json.optString("address1"))
+        )
     }
 
     fun myBooks(token: String): Result<List<Book>> = request("/my-books", token, "GET", null).map { json ->
