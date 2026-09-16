@@ -89,27 +89,52 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply { text = "Miao Library"; textSize = 28f; typeface = Typeface.DEFAULT_BOLD }, matchWrap())
         root.addView(TextView(this).apply { text = "Your library account"; textSize = 15f; setTextColor(Color.DKGRAY); setPadding(0, 4, 0, 8) }, matchWrap())
         val navigation = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 14, 0, 12) }
-        val myBooksButton = Button(this).apply { text = "My Books" }; val catalogueButton = Button(this).apply { text = "Catalogue" }
+        val myBooksButton = Button(this).apply { text = "My Books" }
+        val catalogueButton = Button(this).apply { text = "Catalogue" }
         navigation.addView(myBooksButton, weightWrap()); navigation.addView(catalogueButton, weightWrap()); root.addView(navigation, matchWrap())
-        val accountButton = Button(this).apply { text = "Account"; setOnClickListener { showAccount() } }; root.addView(accountButton, matchWrap())
-        val aboutButton = Button(this).apply {
-            text = "About & Privacy"
-            setOnClickListener {
-                startActivity(Intent(this@MainActivity, AboutActivity::class.java))
-            }
-        }
-        root.addView(aboutButton, matchWrap())
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 4, 0, 8) }; root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        root.addView(Button(this).apply { text = "Log out"; setOnClickListener { session.clearToken(); currentToken = null; showLogin() } }, matchWrap()); setContentView(root)
-        myBooksButton.setOnClickListener { isHomeScreen = false; loadMyBooks() }; catalogueButton.setOnClickListener { isHomeScreen = false; showCatalogueSearch() }; loadMyBooks()
+        root.addView(Button(this).apply { text = "Account"; setOnClickListener { showAccount() } }, matchWrap())
+        root.addView(Button(this).apply { text = "About & Privacy"; setOnClickListener { startActivity(Intent(this@MainActivity, AboutActivity::class.java)) } }, matchWrap())
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 4, 0, 8) }
+        root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(Button(this).apply { text = "Log out"; setOnClickListener { session.clearToken(); currentToken = null; showLogin() } }, matchWrap())
+        setContentView(root)
+        myBooksButton.setOnClickListener { isHomeScreen = false; loadMyBooks() }
+        catalogueButton.setOnClickListener { isHomeScreen = false; showCatalogueSearch() }
+        loadHomeDashboard()
     }
 
-    private fun loadHomeUpdates() {
+    private fun loadHomeDashboard() {
+        content.removeAllViews()
+        content.addView(sectionHeader("Home", "Library updates and your current account summary"))
+        content.addView(label("Loading home…", 16f))
+        val token = currentToken ?: return
         Thread {
-            val result = api.libraryContent()
+            val booksResult = api.myBooks(token)
+            val contentResult = api.libraryContent()
             runOnUiThread {
                 if (!isHomeScreen) return@runOnUiThread
-                content.addView(LibraryUpdatesView.create(this, result.getOrElse { emptyList() }))
+                content.removeAllViews()
+                content.addView(sectionHeader("Home", "Library updates and your current account summary"))
+                if (booksResult.isSuccess) {
+                    val books = booksResult.getOrThrow()
+                    content.addView(label(if (books.isEmpty()) "No books are currently issued." else "${books.size} book(s) currently issued", 16f))
+                    DueDateReminderScheduler.schedule(this, books)
+                    if (books.isNotEmpty()) {
+                        books.take(3).forEach { book ->
+                            val summary = LinearLayout(this).apply {
+                                orientation = LinearLayout.VERTICAL
+                                addView(label(book.title, 17f).apply { setTypeface(null, Typeface.BOLD) })
+                                addView(detailRow("Due date", book.dueDate.ifBlank { "Not available" }))
+                            }
+                            content.addView(styledContainer(summary))
+                        }
+                    }
+                } else {
+                    content.addView(label("Unable to load your account summary.", 15f))
+                    handleFailure(booksResult.exceptionOrNull())
+                    if (!isHomeScreen) return@runOnUiThread
+                }
+                content.addView(LibraryUpdatesView.create(this, contentResult.getOrElse { emptyList() }))
             }
         }.start()
     }
@@ -124,7 +149,7 @@ class MainActivity : Activity() {
 
     private fun loadMyBooks() {
         content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); content.addView(historyButton()); content.addView(label("Loading your books…", 16f)); val token = currentToken ?: return
-        Thread { val result = api.myBooks(token); runOnUiThread { if (result.isSuccess) { content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); content.addView(historyButton()); val books = result.getOrThrow(); if (books.isEmpty()) content.addView(emptyState("You have no books currently issued.")) else books.forEach { book -> val id = extractBiblionumber(book.detailsUrl); val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(book.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(book.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Due date", book.dueDate.ifBlank { "Not available" })); addView(detailRow("Call number", book.callNumber.ifBlank { "Not available" })) }; content.addView(if (id != null) clickableContainer(item) { showBookDetails(id) { loadMyBooks() } } else styledContainer(item)) }; if (isHomeScreen) loadHomeUpdates() } else handleFailure(result.exceptionOrNull()) } }.start()
+        Thread { val result = api.myBooks(token); runOnUiThread { if (result.isSuccess) { content.removeAllViews(); content.addView(sectionHeader("My Books", "Books currently issued to your account")); content.addView(historyButton()); val books = result.getOrThrow(); DueDateReminderScheduler.schedule(this, books); if (books.isEmpty()) content.addView(emptyState("You have no books currently issued.")) else books.forEach { book -> val id = extractBiblionumber(book.detailsUrl); val item = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(label(book.title, 18f).apply { setTypeface(null, Typeface.BOLD) }); addView(label(book.author.ifBlank { "Author not available" }, 15f)); addView(detailRow("Due date", book.dueDate.ifBlank { "Not available" })); addView(detailRow("Call number", book.callNumber.ifBlank { "Not available" })) }; content.addView(if (id != null) clickableContainer(item) { showBookDetails(id) { loadMyBooks() } } else styledContainer(item)) } } else handleFailure(result.exceptionOrNull()) } }.start()
     }
 
     private fun loadHistory() {
