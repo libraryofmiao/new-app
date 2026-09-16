@@ -10,6 +10,8 @@ private const val GATEWAY_URL = "https://api.miaolibrary.in"
 data class Book(val title: String, val author: String, val dueDate: String, val callNumber: String, val status: String, val detailsUrl: String = "")
 data class HistoryRecord(val title: String, val author: String, val date: String, val callNumber: String, val status: String)
 data class CatalogueItem(val biblionumber: Int, val title: String, val author: String, val library: String, val callNumber: String, val availability: String, val holdingCount: Int)
+data class Holding(val itemType: String, val currentLibrary: String, val homeLibrary: String, val collection: String, val shelvingLocation: String, val callNumber: String, val materialsSpecified: String, val volumeInfo: String, val copyNumber: String, val status: String, val notes: String, val dateDue: String, val barcode: String)
+data class BookDetails(val biblionumber: Int, val title: String, val author: String, val holdings: List<Holding>)
 
 class LibraryApi {
     fun login(username: String, password: String): Result<String> {
@@ -51,6 +53,22 @@ class LibraryApi {
                 }
             }
         }
+    }
+
+    fun bookDetails(token: String, biblionumber: Int): Result<BookDetails> = request("/book-details/$biblionumber", token, "GET", null).map { json ->
+        val array = json.optJSONArray("holdings") ?: org.json.JSONArray()
+        val holdings = buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                add(Holding(
+                    item.optString("item_type"), item.optString("current_library"), item.optString("home_library"),
+                    item.optString("collection"), item.optString("shelving_location"), item.optString("call_number"),
+                    item.optString("materials_specified"), item.optString("volume_info"), item.optString("copy_number"),
+                    item.optString("status"), item.optString("notes"), item.optString("date_due"), item.optString("barcode")
+                ))
+            }
+        }
+        BookDetails(json.optInt("biblionumber", biblionumber), json.optString("title", "Untitled"), json.optString("author"), holdings)
     }
 
     private fun request(path: String, token: String?, method: String, body: String?): Result<JSONObject> = try {
