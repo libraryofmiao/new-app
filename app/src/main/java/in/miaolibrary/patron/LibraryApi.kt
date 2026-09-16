@@ -24,64 +24,36 @@ class LibraryApi {
     }
 
     fun account(token: String): Result<AccountInfo> = request("/account", token, "GET", null).map { json ->
-        AccountInfo(
-            username = json.optString("username"),
-            cardNumber = json.optString("cardnumber", json.optString("card_number")),
-            firstName = json.optString("firstname", json.optString("first_name")),
-            surname = json.optString("surname", json.optString("last_name")),
-            email = json.optString("email"),
-            phone = json.optString("phone", json.optString("mobile")),
-            address = json.optString("address", json.optString("address1"))
-        )
+        AccountInfo(json.optString("username"), json.optString("cardnumber", json.optString("card_number")), json.optString("firstname", json.optString("first_name")), json.optString("surname", json.optString("last_name")), json.optString("email"), json.optString("phone", json.optString("mobile")), json.optString("address", json.optString("address1")))
     }
 
     fun myBooks(token: String): Result<List<Book>> = request("/my-books", token, "GET", null).map { json ->
         val array = json.optJSONArray("books") ?: return@map emptyList()
-        buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                add(Book(item.optString("title", "Untitled"), item.optString("author"), item.optString("due_date"), item.optString("call_number"), item.optString("status", "checked_out"), item.optString("details_url")))
-            }
-        }
+        buildList { for (index in 0 until array.length()) { val item = array.optJSONObject(index) ?: continue; add(Book(item.optString("title", "Untitled"), item.optString("author"), item.optString("due_date"), item.optString("call_number"), item.optString("status", "checked_out"), item.optString("details_url"))) } }
     }
 
     fun issueHistory(token: String): Result<List<HistoryRecord>> = request("/issue-history", token, "GET", null).map { json ->
         val array = json.optJSONArray("records") ?: return@map emptyList()
-        buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                add(HistoryRecord(item.optString("title", "Untitled"), item.optString("author"), item.optString("date"), item.optString("call_number"), item.optString("status")))
-            }
-        }
+        buildList { for (index in 0 until array.length()) { val item = array.optJSONObject(index) ?: continue; add(HistoryRecord(item.optString("title", "Untitled"), item.optString("author"), item.optString("date"), item.optString("call_number"), item.optString("status"))) } }
     }
 
     fun catalogueSearch(token: String, query: String): Result<List<CatalogueItem>> {
         val encoded = URLEncoder.encode(query, Charsets.UTF_8.name())
         return request("/catalogue/search?q=$encoded", token, "GET", null).map { json ->
             val array = json.optJSONArray("results") ?: return@map emptyList()
-            buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    add(CatalogueItem(item.optInt("biblionumber"), item.optString("title", "Untitled"), item.optString("author"), item.optString("library"), item.optString("call_number"), item.optString("availability"), item.optInt("holding_count")))
-                }
-            }
+            buildList { for (index in 0 until array.length()) { val item = array.optJSONObject(index) ?: continue; add(CatalogueItem(item.optInt("biblionumber"), item.optString("title", "Untitled"), item.optString("author"), item.optString("library"), item.optString("call_number"), item.optString("availability"), item.optInt("holding_count"))) } }
         }
     }
 
     fun bookDetails(token: String, biblionumber: Int): Result<BookDetails> = request("/book-details/$biblionumber", token, "GET", null).map { json ->
         val array = json.optJSONArray("holdings") ?: org.json.JSONArray()
-        val holdings = buildList {
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                add(Holding(
-                    item.optString("item_type"), item.optString("current_library"), item.optString("home_library"),
-                    item.optString("collection"), item.optString("shelving_location"), item.optString("call_number"),
-                    item.optString("materials_specified"), item.optString("volume_info"), item.optString("copy_number"),
-                    item.optString("status"), item.optString("notes"), item.optString("date_due"), item.optString("barcode")
-                ))
-            }
-        }
+        val holdings = buildList { for (index in 0 until array.length()) { val item = array.optJSONObject(index) ?: continue; add(Holding(item.optString("item_type"), item.optString("current_library"), item.optString("home_library"), item.optString("collection"), item.optString("shelving_location"), item.optString("call_number"), item.optString("materials_specified"), item.optString("volume_info"), item.optString("copy_number"), item.optString("status"), item.optString("notes"), item.optString("date_due"), item.optString("barcode"))) } }
         BookDetails(json.optInt("biblionumber", biblionumber), json.optString("title", "Untitled"), json.optString("author"), holdings)
+    }
+
+    /** Reads published announcements, events, and advertisements from the future gateway CMS feed. */
+    fun libraryContent(): Result<List<LibraryContentItem>> = request("/cms/content", null, "GET", null).map { json ->
+        LibraryContentParser.parse(json)
     }
 
     private fun request(path: String, token: String?, method: String, body: String?): Result<JSONObject> = try {
@@ -91,10 +63,7 @@ class LibraryApi {
             readTimeout = 15_000
             setRequestProperty("Accept", "application/json")
             if (token != null) setRequestProperty("Authorization", "Bearer $token")
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
+            if (body != null) { doOutput = true; setRequestProperty("Content-Type", "application/json") }
         }
         if (body != null) connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
         val code = connection.responseCode
@@ -103,7 +72,5 @@ class LibraryApi {
         val json = runCatching { JSONObject(text) }.getOrNull()
         if (code in 200..299 && json != null) Result.success(json)
         else Result.failure(Exception(json?.optString("detail").orEmpty().ifBlank { "Server error ($code)" }))
-    } catch (error: Exception) {
-        Result.failure(error)
-    }
+    } catch (error: Exception) { Result.failure(error) }
 }
