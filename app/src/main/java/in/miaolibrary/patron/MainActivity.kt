@@ -2,6 +2,7 @@ package in.miaolibrary.patron
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -88,6 +89,13 @@ class MainActivity : Activity() {
         val myBooksButton = Button(this).apply { text = "My Books" }; val catalogueButton = Button(this).apply { text = "Catalogue" }
         navigation.addView(myBooksButton, weightWrap()); navigation.addView(catalogueButton, weightWrap()); root.addView(navigation, matchWrap())
         val accountButton = Button(this).apply { text = "Account"; setOnClickListener { showAccount() } }; root.addView(accountButton, matchWrap())
+        val aboutButton = Button(this).apply {
+            text = "About & Privacy"
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, AboutActivity::class.java))
+            }
+        }
+        root.addView(aboutButton, matchWrap())
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 4, 0, 8) }; root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         root.addView(Button(this).apply { text = "Log out"; setOnClickListener { session.clearToken(); currentToken = null; showLogin() } }, matchWrap()); setContentView(root)
         myBooksButton.setOnClickListener { loadMyBooks() }; catalogueButton.setOnClickListener { showCatalogueSearch() }; loadMyBooks()
