@@ -7,22 +7,13 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 
-/**
- * Reusable Home-screen renderer for CMS content.
- *
- * The gateway CMS endpoint will provide the content later. Until then this
- * component safely renders an empty state instead of showing invented data.
- */
+/** Reusable Home-screen renderer for future CMS content. */
 object LibraryUpdatesView {
-    fun create(
-        parentContext: android.content.Context,
-        items: List<LibraryContentItem> = emptyList()
-    ): LinearLayout {
+    fun create(parentContext: android.content.Context, items: List<LibraryContentItem> = emptyList()): LinearLayout {
         val container = LinearLayout(parentContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 18, 0, 8)
         }
-
         container.addView(TextView(parentContext).apply {
             text = "Library Updates"
             textSize = 21f
@@ -35,11 +26,10 @@ object LibraryUpdatesView {
             setTextColor(Color.DKGRAY)
             setPadding(0, 0, 0, 12)
         })
-
         if (items.isEmpty()) {
             container.addView(card(parentContext, "No library updates are available right now."))
         } else {
-            items.sortedBy { it.order }.forEach { item ->
+            items.sortedBy { it.sortOrder }.forEach { item ->
                 val text = buildString {
                     append(item.title.ifBlank { "Library update" })
                     if (item.body.isNotBlank()) append("\n\n${item.body}")
