@@ -139,12 +139,42 @@ class ModernDashboardActivity : Activity() {
         addView(navItem("ACCOUNT", "account") { showShell("account") }, weight())
     }
 
-    private fun navItem(label: String, key: String, click: () -> Unit): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(2, dp(4), 2, dp(4)); setOnClickListener { click() }
-        val icon = text(when (key) { "home" -> "⌂"; "catalogue" -> "⌕"; "books" -> "▣"; else -> "●" }, 22f, if (screen == key) green else muted, true).apply { gravity = Gravity.CENTER }
-        val name = text(label, 10f, if (screen == key) green else muted, true).apply { gravity = Gravity.CENTER }
-        addView(icon, match()); addView(name, match())
-    }
+    private fun navItem(label: String, key: String, click: () -> Unit): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(2, dp(4), 2, dp(4))
+            setOnClickListener { click() }
+
+            val drawableId = when (key) {
+                "home" -> R.drawable.ic_nav_home
+                "catalogue" -> R.drawable.ic_nav_catalogue
+                "books" -> R.drawable.ic_nav_books
+                else -> R.drawable.ic_nav_account
+            }
+
+            val icon = ImageView(this@ModernDashboardActivity).apply {
+                setImageResource(drawableId)
+                imageTintList = android.content.res.ColorStateList.valueOf(
+                    if (screen == key) green else muted
+                )
+                contentDescription = label
+                scaleType = ImageView.ScaleType.CENTER
+            }
+
+            val name = text(
+                label,
+                10f,
+                if (screen == key) green else muted,
+                true
+            ).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(3), 0, 0)
+            }
+
+            addView(icon, LinearLayout.LayoutParams(-1, dp(28)))
+            addView(name, match())
+        }
 
     private fun loadHome() {
         body.removeAllViews()
