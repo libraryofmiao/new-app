@@ -12,6 +12,8 @@ Android patron app for Miao Library.
 - Book details with bibliographic information and holdings/copy details
 - Bundled Miao Library logo
 - Android back navigation between catalogue, My Books, and book details
+- About & Privacy screen
+- Android notification permission setup for future due-date reminders
 
 ## Architecture
 
@@ -26,9 +28,18 @@ It does not call Koha directly. The gateway communicates with the Koha OPAC at:
 ## Project structure
 
 - `app/src/main/java/in/miaolibrary/patron/MainActivity.kt` — screens and navigation
+- `app/src/main/java/in/miaolibrary/patron/AboutActivity.kt` — About, privacy, and support information
 - `app/src/main/java/in/miaolibrary/patron/LibraryApi.kt` — gateway API client
-- `app/src/main/java/in/miaolibrary/patron/SessionStore.kt` — session storage support
+- `app/src/main/java/in/miaolibrary/patron/MiaoLibraryApplication.kt` — notification channel setup
 - `app/src/main/assets/miao_logo_base64.txt` — bundled library logo
+
+## Planned gateway-dependent features
+
+- CMS-powered announcements, events, advertisements, HTML, JPG previews, and additional logos
+- Closed-app due-date push notifications with device registration and server-side scheduling
+- Offline caching and background refresh
+
+These features require corresponding authenticated gateway endpoints and server-side scheduling; the Android client must not connect directly to Koha.
 
 ## Build
 
