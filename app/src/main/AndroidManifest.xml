@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".MiaoLibraryApplication"
         android:allowBackup="true"
         android:label="Miao Library"
         android:supportsRtl="true"
