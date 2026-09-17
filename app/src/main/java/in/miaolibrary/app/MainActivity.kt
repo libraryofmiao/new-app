@@ -896,8 +896,6 @@ class MainActivity : AppCompatActivity() {
         for (i in 0 until items.length()) {
             val item = items.optJSONObject(i) ?: continue
 
-            if (!current && !isReturnedIssue(item)) continue
-
             val box = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
 
