@@ -3,7 +3,6 @@ package in.miaolibrary.app
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -19,6 +18,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
     private val gatewayBaseUrl = "https://api.miaolibrary.in"
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,16 +29,15 @@ class MainActivity : AppCompatActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(32, 24, 32, 32)
+            setPadding(dp(32), dp(24), dp(32), dp(32))
             setBackgroundColor(Color.rgb(247, 243, 236))
         }
-
         val logo = ImageView(this).apply {
             setImageResource(R.drawable.logo)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Miao Library logo"
         }
-        root.addView(logo, LinearLayout.LayoutParams(-1, 210))
+        root.addView(logo, LinearLayout.LayoutParams(-1, dp(210)))
 
         val title = TextView(this).apply {
             text = "Welcome to Miao Library"
@@ -47,9 +46,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setTypeface(typeface, 1)
         }
-        root.addView(title, LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(0, 18, 0, 6)
-        })
+        root.addView(title, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(18), 0, dp(6)) })
 
         val subtitle = TextView(this).apply {
             text = "Sign in to access your library account"
@@ -57,18 +54,12 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.DKGRAY)
             gravity = Gravity.CENTER
         }
-        root.addView(subtitle, LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(0, 0, 0, 28)
-        })
+        root.addView(subtitle, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(28)) })
 
-        val userLayout = TextInputLayout(this).apply {
-            hint = "Library username"
-        }
+        val userLayout = TextInputLayout(this).apply { hint = "Library username" }
         val userEdit = TextInputEditText(this)
         userLayout.addView(userEdit)
-        root.addView(userLayout, LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(0, 0, 0, 12)
-        })
+        root.addView(userLayout, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
 
         val passLayout = TextInputLayout(this).apply {
             hint = "Password"
@@ -86,9 +77,7 @@ class MainActivity : AppCompatActivity() {
             minimumHeight = 0
             setPadding(0, 0, 0, 0)
         }
-        root.addView(button, LinearLayout.LayoutParams(-1, 56).apply {
-            setMargins(0, 24, 0, 0)
-        })
+        root.addView(button, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(24), 0, 0) })
 
         button.setOnClickListener {
             val username = userEdit.text?.toString()?.trim().orEmpty()
@@ -101,7 +90,6 @@ class MainActivity : AppCompatActivity() {
             button.text = "Signing in…"
             signIn(username, password, button)
         }
-
         setContentView(root)
     }
 
@@ -127,9 +115,7 @@ class MainActivity : AppCompatActivity() {
                 val response = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
                 if (status !in 200..299) throw Exception("Login failed ($status)")
                 val json = JSONObject(response)
-                val token = json.optString("access_token").ifBlank {
-                    json.optString("token")
-                }
+                val token = json.optString("access_token").ifBlank { json.optString("token") }
                 if (token.isBlank()) throw Exception("Gateway did not return a session token")
                 getSharedPreferences("session", MODE_PRIVATE).edit()
                     .putString("access_token", token)
