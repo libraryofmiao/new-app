@@ -997,6 +997,19 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
+    private fun isReturnedIssue(item: JSONObject): Boolean {
+        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
+        if (returnedKeys.any {
+                val value = item.optString(it, "").trim()
+                value.isNotBlank() && value != "null"
+            }) return true
+
+        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
+        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
+        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
+        return false
+    }
+
     private fun account(body: LinearLayout) {
     body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; addView(text("Library account", 21f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) }); addView(text("Your Koha patron account", 13f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(16)) })
     val my = button("View my books", false).apply { textSize = 15f }; body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
