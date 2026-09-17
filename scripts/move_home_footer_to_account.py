@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 path = Path("app/src/main/java/in/miaolibrary/app/MainActivity.kt")
 s = path.read_text(encoding="utf-8")
@@ -11,6 +10,19 @@ home_footer = '''    val footer = LinearLayout(this).apply { orientation = Linea
     body.addView(footer)
 '''
 s = s.replace(home_footer, "", 1)
+
+bad_tail = '''    }) return true
+
+        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
+        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
+        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
+        return false
+    }
+
+    private fun isReturnedIssue(item: JSONObject): Boolean {'''
+s = s.replace(bad_tail, '''    }
+
+    private fun isReturnedIssue(item: JSONObject): Boolean {''', 1)
 
 helper = '''    private fun isReturnedIssue(item: JSONObject): Boolean {
         val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
