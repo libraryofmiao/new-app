@@ -1,0 +1,59 @@
+name: Fix Previous Issues loading
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Previous Issues loading
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt')
+          s = p.read_text()
+
+          marker = '    private lateinit var content: FrameLayout\n'
+          prop = marker + '    // Exact active-loan identifiers used to keep current loans out of Previous Issues.\n    private val currentIssueKeys = mutableSetOf<String>()\n'
+          if 'private val currentIssueKeys' not in s:
+              if marker not in s:
+                  raise SystemExit('class field marker not found')
+              s = s.replace(marker, prop, 1)
+
+          old_items = '''                    val items = arrayFrom(\n                        response,\n                        "books",\n                        "items",\n                        "issues",\n                        "current",\n                        "current_books"\n                    )\n'''
+          new_items = old_items + '''\n                    currentIssueKeys.clear()\n                    for (i in 0 until items.length()) {\n                        items.optJSONObject(i)?.let { currentIssueKeys.addAll(issueKeys(it)) }\n                    }\n'''
+          if 'currentIssueKeys.clear()' not in s:
+              if old_items not in s:
+                  raise SystemExit('current books parsing block not found')
+              s = s.replace(old_items, new_items, 1)
+
+          old_filter = '            if (!current && !isReturnedIssue(item)) continue\n'
+          new_filter = '            if (!current && isCurrentIssue(item)) continue\n'
+          if old_filter in s:
+              s = s.replace(old_filter, new_filter, 1)
+          elif 'if (!current && isCurrentIssue(item)) continue' not in s:
+              raise SystemExit('history filter location not found')
+
+          marker2 = '    private fun isReturnedIssue(item: JSONObject): Boolean {\n'
+          helper = '''    private fun isCurrentIssue(item: JSONObject): Boolean {\n        if (currentIssueKeys.isEmpty()) return false\n        return issueKeys(item).any { currentIssueKeys.contains(it) }\n    }\n\n    private fun issueKeys(item: JSONObject): Set<String> {\n        val keys = mutableSetOf<String>()\n\n        fun add(prefix: String, value: String) {\n            val v = value.trim()\n            if (v.isNotBlank() && v != "null") keys.add("$prefix:$v")\n        }\n\n        add("issue", first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId"))\n        add("item", first(item, "item_id", "itemid", "itemId", "itemnumber", "item_number"))\n\n        val barcode = first(item, "barcode", "item_barcode")\n        val issued = first(item, "checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout")\n        val due = first(item, "date_due", "due_date", "duedate", "due")\n\n        if (barcode.isNotBlank() && issued.isNotBlank()) add("barcode-issued", "$barcode|$issued")\n        if (barcode.isNotBlank() && due.isNotBlank()) add("barcode-due", "$barcode|$due")\n\n        return keys\n    }\n\n'''
+          if 'private fun isCurrentIssue(item: JSONObject)' not in s:
+              if marker2 not in s:
+                  raise SystemExit('history helper marker not found')
+              s = s.replace(marker2, helper + marker2, 1)
+
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          git diff --cached --quiet || git commit -m 'Fix Previous Issues loading and active-loan filtering'
+          git push
