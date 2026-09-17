@@ -1,0 +1,51 @@
+name: Apply Catalogue UI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Catalogue screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt')
+          s = p.read_text()
+
+          old = '''body.addView(text(section, 26f).apply { setTypeface(typeface, 1) })'''
+          new = '''body.addView(text(section, 26f).apply {
+              setTypeface(typeface, 1)
+              if (section == "Catalogue") gravity = Gravity.CENTER
+          })'''
+          if old in s:
+              s = s.replace(old, new, 1)
+
+          old = '''val itemCard = card(box); itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })'''
+          new = '''val itemCard = card(box).apply {
+              background = GradientDrawable().apply {
+                  setColor(Color.WHITE)
+                  setStroke(dp(2), Color.rgb(74, 82, 91))
+                  cornerRadius = dp(20).toFloat()
+              }
+          }
+          itemCard.setOnClickListener { openDetails(item) }
+          output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })'''
+          if old not in s:
+              raise SystemExit('Catalogue result-card pattern not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          git diff --cached --quiet || git commit -m "Improve Catalogue screen and distinguish search result cards"
+          git push
