@@ -1012,7 +1012,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         add("issue", first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId"))
-        add("item", first(item, "item_id", "itemid", "itemId", "itemnumber", "item_number"))
 
         val barcode = first(item, "barcode", "item_barcode")
         val issued = first(item, "checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout")
