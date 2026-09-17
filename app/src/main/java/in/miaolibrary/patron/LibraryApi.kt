@@ -1,5 +1,6 @@
 package `in`.miaolibrary.patron
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -38,20 +39,40 @@ class LibraryApi {
     }
 
     fun catalogueSearch(token: String, query: String): Result<List<CatalogueItem>> {
-        val encoded = URLEncoder.encode(query, Charsets.UTF_8.name())
+        val cleanQuery = query.trim()
+        if (cleanQuery.isBlank()) return Result.success(emptyList())
+        val encoded = URLEncoder.encode(cleanQuery, Charsets.UTF_8.name())
         return request("/catalogue/search?q=$encoded", token, "GET", null).map { json ->
-            val array = json.optJSONArray("results") ?: return@map emptyList()
-            buildList { for (index in 0 until array.length()) { val item = array.optJSONObject(index) ?: continue; add(CatalogueItem(item.optInt("biblionumber"), item.optString("title", "Untitled"), item.optString("author"), item.optString("library"), item.optString("call_number"), item.optString("availability"), item.optInt("holding_count"))) } }
+            // The gateway's official response is { results: [...] }. These fallbacks
+            // keep the frontend compatible with older gateway response wrappers.
+            val array = json.optJSONArray("results")
+                ?: json.optJSONArray("items")
+                ?: json.optJSONArray("books")
+                ?: json.optJSONObject("data")?.optJSONArray("results")
+                ?: JSONArray()
+
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = item.optInt("biblionumber", item.optInt("biblio_id", item.optInt("id")))
+                    val title = item.optString("title").ifBlank { item.optString("name") }.ifBlank { "Untitled" }
+                    val author = item.optString("author").ifBlank { item.optString("authors") }
+                    val library = item.optString("library").ifBlank { item.optString("location") }
+                    val callNumber = item.optString("call_number").ifBlank { item.optString("callNumber") }
+                    val availability = item.optString("availability").ifBlank { item.optString("status") }
+                    val holdingCount = item.optInt("holding_count", item.optInt("holdings_count", item.optInt("copies")))
+                    add(CatalogueItem(id, title, author, library, callNumber, availability, holdingCount))
+                }
+            }
         }
     }
 
     fun bookDetails(token: String, biblionumber: Int): Result<BookDetails> = request("/book-details/$biblionumber", token, "GET", null).map { json ->
-        val array = json.optJSONArray("holdings") ?: org.json.JSONArray()
+        val array = json.optJSONArray("holdings") ?: JSONArray()
         val holdings = buildList { for (index in 0 until array.length()) { val item = array.optJSONObject(index) ?: continue; add(Holding(item.optString("item_type"), item.optString("current_library"), item.optString("home_library"), item.optString("collection"), item.optString("shelving_location"), item.optString("call_number"), item.optString("materials_specified"), item.optString("volume_info"), item.optString("copy_number"), item.optString("status"), item.optString("notes"), item.optString("date_due"), item.optString("barcode"))) } }
         BookDetails(json.optInt("biblionumber", biblionumber), json.optString("title", "Untitled"), json.optString("author"), holdings)
     }
 
-    /** Reads published announcements, events, and advertisements from the future gateway CMS feed. */
     fun libraryContent(): Result<List<LibraryContentItem>> = request("/cms/content", null, "GET", null).map { json ->
         LibraryContentParser.parse(json)
     }
@@ -61,6 +82,7 @@ class LibraryApi {
             requestMethod = method
             connectTimeout = 15_000
             readTimeout = 15_000
+            doInput = true
             setRequestProperty("Accept", "application/json")
             if (token != null) setRequestProperty("Authorization", "Bearer $token")
             if (body != null) { doOutput = true; setRequestProperty("Content-Type", "application/json") }
@@ -69,6 +91,7 @@ class LibraryApi {
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        connection.disconnect()
         val json = runCatching { JSONObject(text) }.getOrNull()
         if (code in 200..299 && json != null) Result.success(json)
         else Result.failure(Exception(json?.optString("detail").orEmpty().ifBlank { "Server error ($code)" }))
