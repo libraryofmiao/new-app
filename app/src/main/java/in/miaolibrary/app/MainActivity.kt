@@ -366,179 +366,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun home(body: LinearLayout) {
-        // Home subtitle removed.
-        // Introduction now blends with the background instead of appearing in a card.
-
-        val exploreText = text(
-            "Arunachal Pradesh's first futuristic New Age Learning Centre — a paradise for book lovers, competitive aspirants, and lifelong learners nestled in the heart of Miao, Changlang district.",
-            18f,
-            ink
-        ).apply {
-            gravity = Gravity.CENTER
-            setPadding(0, dp(18), 0, dp(18))
-        }
-
-        exploreText.textAlignment = View.TEXT_ALIGNMENT_CENTER
-
-        val intro = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(bg)
-            setPadding(0, dp(8), 0, dp(24))
-            addView(
-                exploreText,
-                LinearLayout.LayoutParams(-1, -2)
-            )
-        }
-
-        body.addView(
-            intro,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, dp(8), 0, dp(16))
-            }
-        )
-
-        val quick = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        val c = button("Catalogue", true).apply {
-            textSize = 15f
-        }
-
-        val b = button("My Books", true).apply {
-            textSize = 15f
-        }
-
-        quick.addView(
-            c,
-            LinearLayout.LayoutParams(0, dp(56), 1f).apply {
-                setMargins(0, 0, dp(6), 0)
-            }
-        )
-
-        quick.addView(
-            b,
-            LinearLayout.LayoutParams(0, dp(56), 1f).apply {
-                setMargins(dp(6), 0, 0, 0)
-            }
-        )
-
-        c.setOnClickListener {
-            dashboard("Catalogue")
-        }
-
-        b.setOnClickListener {
-            dashboard("My Books")
-        }
-
-        body.addView(quick)
-
-        body.addView(
-            text("Library updates", 20f).apply {
-                gravity = Gravity.CENTER
-                setTypeface(typeface, 1)
-                setPadding(0, dp(24), 0, dp(10))
-            }
-        )
-
-        val loading = card(
-            text("Loading announcements…", 14f, muted)
-        )
-
-        body.addView(loading)
-
-        request(
-            "/cms/content",
-            "GET",
-            null,
-            token()
-        ) { ok, response ->
-            runOnUiThread {
-                body.removeView(loading)
-
-                if (!ok) {
-                    body.addView(
-                        card(
-                            text(
-                                "Announcements are temporarily unavailable.",
-                                14f,
-                                muted
-                            )
-                        )
-                    )
-                } else {
-                    val items = arrayFrom(
-                        response,
-                        "items",
-                        "content",
-                        "announcements"
-                    )
-
-                    if (items.length() == 0) {
-                        body.addView(
-                            card(
-                                text(
-                                    "No current announcements.",
-                                    14f,
-                                    muted
-                                )
-                            )
-                        )
-                    } else {
-                        for (i in 0 until items.length()) {
-                            val item =
-                                items.optJSONObject(i) ?: continue
-
-                            val box = LinearLayout(this).apply {
-                                orientation = LinearLayout.VERTICAL
-
-                                addView(
-                                    text(
-                                        first(
-                                            item,
-                                            "title",
-                                            "name"
-                                        ).ifBlank {
-                                            "Published announcement"
-                                        },
-                                        17f
-                                    ).apply {
-                                        setTypeface(typeface, 1)
-                                    }
-                                )
-
-                                addView(
-                                    text(
-                                        first(
-                                            item,
-                                            "body",
-                                            "description",
-                                            "html",
-                                            "content"
-                                        ),
-                                        14f,
-                                        muted
-                                    ).apply {
-                                        setPadding(0, dp(8), 0, 0)
-                                    }
-                                )
-                            }
-
-                            body.addView(
-                                card(box),
-                                LinearLayout.LayoutParams(-1, -2).apply {
-                                    setMargins(0, 0, 0, dp(12))
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Home footer intentionally removed.
-    }
+    body.addView(text("A welcoming space for learning, discovery and connection", 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(16)) })
+    val exploreText = text("Arunachal Pradesh's first futuristic New Age Learning Centre — a paradise for book lovers, competitive aspirants, and lifelong learners nestled in the heart of Miao, Changlang district.", 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }
+    exploreText.textAlignment = View.TEXT_ALIGNMENT_CENTER
+    body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(exploreText) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(16)) })
+    val quick = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+    val c = button("Catalogue", true).apply { textSize = 15f }
+    val b = button("My Books", true).apply { textSize = 15f }
+    quick.addView(c, LinearLayout.LayoutParams(0, dp(56), 1f).apply { setMargins(0, 0, dp(6), 0) })
+    quick.addView(b, LinearLayout.LayoutParams(0, dp(56), 1f).apply { setMargins(dp(6), 0, 0, 0) })
+    c.setOnClickListener { dashboard("Catalogue") }; b.setOnClickListener { dashboard("My Books") }; body.addView(quick)
+    body.addView(text("Library updates", 20f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) })
+    val loading = card(text("Loading announcements…", 14f, muted)); body.addView(loading)
+    request("/cms/content", "GET", null, token()) { ok, response -> runOnUiThread { body.removeView(loading); if (!ok) body.addView(card(text("Announcements are temporarily unavailable.", 14f, muted))) else { val items = arrayFrom(response, "items", "content", "announcements"); if (items.length() == 0) body.addView(card(text("No current announcements.", 14f, muted))) else for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Published announcement" }, 17f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "body", "description", "html", "content"), 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }; body.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } } } }
+    val footer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(0, dp(30), 0, dp(12)) }
+    val website = text("Our Official Website : miaolibrary.in", 14f, ink).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setOnClickListener { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://miaolibrary.in"))) } }
+    footer.addView(website)
+    footer.addView(text("© Sub Divisional Library, Miao. All Rights Reserved.", 12f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) })
+    body.addView(footer)
+}
 
     private fun catalogue(body: LinearLayout) {
         val input = EditText(this).apply {
@@ -1152,99 +998,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun account(body: LinearLayout) {
-        body.addView(
-            card(
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-
-                    addView(
-                        text("Library account", 20f).apply {
-                            setTypeface(typeface, 1)
-                        }
-                    )
-
-                    addView(
-                        text(username(), 15f, muted).apply {
-                            setPadding(0, dp(8), 0, 0)
-                        }
-                    )
-                }
-            ),
-            LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, dp(14), 0, dp(14))
-            }
-        )
-
-        val my = button("View my books", false)
-
-        body.addView(
-            my,
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                setMargins(0, 0, 0, dp(10))
-            }
-        )
-
-        my.setOnClickListener {
-            dashboard("My Books")
-        }
-
-        val logout = button("Log out")
-
-        body.addView(
-            logout,
-            LinearLayout.LayoutParams(-1, dp(52))
-        )
-
-        logout.setOnClickListener {
-            prefs().edit().clear().apply()
-            login()
-        }
-
-        // Footer added to Account.
-        val footer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(30), 0, dp(12))
-        }
-
-        val website = text(
-            "Our Official Website : miaolibrary.in",
-            14f,
-            ink
-        ).apply {
-            gravity = Gravity.CENTER
-            setTypeface(typeface, 1)
-
-            setOnClickListener {
-                startActivity(
-                    android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://miaolibrary.in")
-                    )
-                )
-            }
-        }
-
-        footer.addView(website)
-
-        footer.addView(
-            text(
-                "© Sub Divisional Library, Miao. All Rights Reserved.",
-                12f,
-                muted
-            ).apply {
-                gravity = Gravity.CENTER
-                setPadding(0, dp(8), 0, 0)
-            }
-        )
-
-        body.addView(
-            footer,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, dp(30), 0, dp(12))
-            }
-        )
-    }
+    body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; addView(text("Library account", 21f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) }); addView(text("Your Koha patron account", 13f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(16)) })
+    val my = button("View my books", false).apply { textSize = 15f }; body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
+    val refresh = button("Refresh account", false).apply { textSize = 15f }; body.addView(refresh, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); refresh.setOnClickListener { dashboard("Account") }
+    val logout = button("Log out", true).apply { background = shape(Color.rgb(155, 76, 76), 16); textSize = 15f }; body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
+}
 
     private fun displayValue(
         item: JSONObject,
