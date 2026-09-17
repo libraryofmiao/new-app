@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path("app/src/main/java/in/miaolibrary/app/MainActivity.kt")
 s = path.read_text(encoding="utf-8")
@@ -11,14 +12,35 @@ home_footer = '''    val footer = LinearLayout(this).apply { orientation = Linea
 '''
 s = s.replace(home_footer, "", 1)
 
-old_account = '''    private fun account(body: LinearLayout) {
-    body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; addView(text("Library account", 21f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) }); addView(text("Your Koha patron account", 13f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(16)) })
-    val my = button("View my books", false).apply { textSize = 15f }; body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
-    val refresh = button("Refresh account", false).apply { textSize = 15f }; body.addView(refresh, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); refresh.setOnClickListener { dashboard("Account") }
-    val logout = button("Log out", true).apply { background = shape(Color.rgb(155, 76, 76), 16); textSize = 15f }; body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
-}'''
+helper = '''    private fun isReturnedIssue(item: JSONObject): Boolean {
+        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
+        if (returnedKeys.any {
+                val value = item.optString(it, "").trim()
+                value.isNotBlank() && value != "null"
+            }) return true
 
-account_footer = '''
+        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
+        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
+        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
+        return false
+    }
+
+'''
+
+if "private fun isReturnedIssue(item: JSONObject)" not in s:
+    marker = "    private fun account(body: LinearLayout) {"
+    if marker not in s:
+        raise SystemExit("account marker not found")
+    s = s.replace(marker, helper + marker, 1)
+
+account_start = s.find("    private fun account(body: LinearLayout) {")
+account_end = s.find("\n\n    private fun displayValue", account_start)
+if account_start < 0 or account_end < 0:
+    raise SystemExit("account boundaries not found")
+
+account = s[account_start:account_end]
+if "Our Official Website : miaolibrary.in" not in account:
+    footer = '''
     val footer = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
@@ -37,14 +59,8 @@ account_footer = '''
         setPadding(0, dp(8), 0, 0)
     })
     body.addView(footer)
-}'''
-
-if old_account not in s:
-    raise SystemExit("expected Account block not found")
-
-if "Our Official Website : miaolibrary.in" not in old_account:
-    s = s.replace(old_account, old_account[:-1] + account_footer, 1)
-else:
-    s = s.replace(old_account, old_account, 1)
+'''
+    account = account.rstrip("\n") + footer + "}"
+    s = s[:account_start] + account + s[account_end:]
 
 path.write_text(s, encoding="utf-8")
