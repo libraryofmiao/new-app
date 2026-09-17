@@ -379,11 +379,6 @@ class MainActivity : AppCompatActivity() {
     body.addView(text("Library updates", 20f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) })
     val loading = card(text("Loading announcements…", 14f, muted)); body.addView(loading)
     request("/cms/content", "GET", null, token()) { ok, response -> runOnUiThread { body.removeView(loading); if (!ok) body.addView(card(text("Announcements are temporarily unavailable.", 14f, muted))) else { val items = arrayFrom(response, "items", "content", "announcements"); if (items.length() == 0) body.addView(card(text("No current announcements.", 14f, muted))) else for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Published announcement" }, 17f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "body", "description", "html", "content"), 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }; body.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } } } }
-    val footer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(0, dp(30), 0, dp(12)) }
-    val website = text("Our Official Website : miaolibrary.in", 14f, ink).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setOnClickListener { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://miaolibrary.in"))) } }
-    footer.addView(website)
-    footer.addView(text("© Sub Divisional Library, Miao. All Rights Reserved.", 12f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) })
-    body.addView(footer)
 }
 
     private fun catalogue(body: LinearLayout) {
@@ -1007,6 +1002,25 @@ class MainActivity : AppCompatActivity() {
     val my = button("View my books", false).apply { textSize = 15f }; body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
     val refresh = button("Refresh account", false).apply { textSize = 15f }; body.addView(refresh, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); refresh.setOnClickListener { dashboard("Account") }
     val logout = button("Log out", true).apply { background = shape(Color.rgb(155, 76, 76), 16); textSize = 15f }; body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
+
+    val footer = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(0, dp(34), 0, dp(12))
+    }
+    val website = text("Our Official Website : miaolibrary.in", 14f, ink).apply {
+        gravity = Gravity.CENTER
+        setTypeface(typeface, 1)
+        setOnClickListener {
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://miaolibrary.in")))
+        }
+    }
+    footer.addView(website)
+    footer.addView(text("© Sub Divisional Library, Miao. All Rights Reserved.", 12f, muted).apply {
+        gravity = Gravity.CENTER
+        setPadding(0, dp(8), 0, 0)
+    })
+    body.addView(footer)
 }
 
     private fun displayValue(
