@@ -34,15 +34,14 @@ account_footer = '''
     body.addView(footer)
 '''
 
-pattern = r'(    private fun account\(body: LinearLayout\) \{.*?    logout\.setOnClickListener \{.*?\n    \})\n\n    private fun displayValue'
+pattern = r'    private fun account\(body: LinearLayout\) \{.*?\n    \}\n\n    private fun displayValue'
 match = re.search(pattern, s, flags=re.S)
 if not match:
     raise SystemExit("account function not found")
 
-account = match.group(1)
+account = match.group(0)
 if "Our Official Website : miaolibrary.in" not in account:
-    account += account_footer
+    account = account.replace("\n    private fun displayValue", account_footer + "\n    private fun displayValue", 1)
 
-s = s[:match.start(1)] + account + s[match.end(1):]
-
+s = s[:match.start()] + account + s[match.end():]
 path.write_text(s, encoding="utf-8")
