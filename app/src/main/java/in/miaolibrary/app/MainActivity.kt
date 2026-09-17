@@ -242,15 +242,6 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
-        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
-        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
-        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
-        return false
-    }
-
     private fun account(body: LinearLayout) { body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Library account", 20f).apply { setTypeface(typeface, 1) }); addView(text(username(), 15f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(14)) }); val my = button("View my books", false); body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }; val logout = button("Log out"); body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() } }
 
     private fun displayValue(item: JSONObject, key: String): String { val value = item.opt(key) ?: return ""; if (value is JSONArray) return prettyArray(value); if (value is JSONObject) return value.toString(); return value.toString().trim() }
