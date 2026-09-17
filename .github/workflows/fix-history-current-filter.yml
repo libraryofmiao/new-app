@@ -1,0 +1,57 @@
+name: Fix Previous Issues current-record filtering
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove broad item matching from history filter
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt')
+          s = p.read_text()
+          old = '''        add("issue", first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId"))
+        add("item", first(item, "item_id", "itemid", "itemId", "itemnumber", "item_number"))
+
+        val barcode = first(item, "barcode", "item_barcode")
+        val issued = first(item, "checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout")
+        val due = first(item, "date_due", "due_date", "duedate", "due")
+
+        if (barcode.isNotBlank() && issued.isNotBlank()) add("barcode-issued", "$barcode|$issued")
+        if (barcode.isNotBlank() && due.isNotBlank()) add("barcode-due", "$barcode|$due")
+'''
+          new = '''        val issueId = first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId")
+        if (issueId.isNotBlank()) {
+            add("issue", issueId)
+            return keys
+        }
+
+        val barcode = first(item, "barcode", "item_barcode")
+        val issued = first(item, "checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout")
+        val due = first(item, "date_due", "due_date", "duedate", "due")
+
+        // Fallback identity uses the complete loan dates, never item_id alone.
+        if (barcode.isNotBlank() && issued.isNotBlank() && due.isNotBlank()) {
+            add("loan", "$barcode|$issued|$due")
+        }
+'''
+          if old not in s:
+              raise SystemExit('expected issue key block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          git diff --cached --quiet || git commit -m 'Fix Previous Issues filtering for reissued items'
+          git push
