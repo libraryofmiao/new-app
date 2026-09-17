@@ -21,6 +21,8 @@ class MainActivity : AppCompatActivity() {
     private val ink = Color.rgb(27, 43, 58)
     private val muted = Color.rgb(105, 112, 117)
     private lateinit var content: FrameLayout
+    // Exact active-loan identifiers used to keep current loans out of Previous Issues.
+    private val currentIssueKeys = mutableSetOf<String>()
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun prefs() = getSharedPreferences("session", MODE_PRIVATE)
@@ -751,6 +753,11 @@ class MainActivity : AppCompatActivity() {
                         "current_books"
                     )
 
+                    currentIssueKeys.clear()
+                    for (i in 0 until items.length()) {
+                        items.optJSONObject(i)?.let { currentIssueKeys.addAll(issueKeys(it)) }
+                    }
+
                     if (items.length() == 0) {
                         current.addView(
                             card(
@@ -890,7 +897,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         for (i in 0 until items.length()) {
             val item = items.optJSONObject(i) ?: continue
-            if (!current && !isReturnedIssue(item)) continue
+            if (!current && isCurrentIssue(item)) continue
 
             val box = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -989,6 +996,32 @@ class MainActivity : AppCompatActivity() {
                 }
             )
         }
+    }
+
+    private fun isCurrentIssue(item: JSONObject): Boolean {
+        if (currentIssueKeys.isEmpty()) return false
+        return issueKeys(item).any { currentIssueKeys.contains(it) }
+    }
+
+    private fun issueKeys(item: JSONObject): Set<String> {
+        val keys = mutableSetOf<String>()
+
+        fun add(prefix: String, value: String) {
+            val v = value.trim()
+            if (v.isNotBlank() && v != "null") keys.add("$prefix:$v")
+        }
+
+        add("issue", first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId"))
+        add("item", first(item, "item_id", "itemid", "itemId", "itemnumber", "item_number"))
+
+        val barcode = first(item, "barcode", "item_barcode")
+        val issued = first(item, "checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout")
+        val due = first(item, "date_due", "due_date", "duedate", "due")
+
+        if (barcode.isNotBlank() && issued.isNotBlank()) add("barcode-issued", "$barcode|$issued")
+        if (barcode.isNotBlank() && due.isNotBlank()) add("barcode-due", "$barcode|$due")
+
+        return keys
     }
 
     private fun isReturnedIssue(item: JSONObject): Boolean {
