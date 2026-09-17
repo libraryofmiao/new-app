@@ -2,7 +2,9 @@ package `in`.miaolibrary.app
 
 import android.graphics.Color
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
+import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -54,17 +56,30 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         }
         root.addView(subtitle, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(28)) })
-        val userLayout = TextInputLayout(this).apply { hint = "Library username" }
-        val userEdit = TextInputEditText(this)
+
+        val userLayout = TextInputLayout(this).apply {
+            hint = "Library username"
+        }
+        val userEdit = TextInputEditText(this).apply {
+            singleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_ACTION_NEXT
+        }
         userLayout.addView(userEdit)
         root.addView(userLayout, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
+
         val passLayout = TextInputLayout(this).apply {
             hint = "Password"
             endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
         }
-        val passEdit = TextInputEditText(this)
+        val passEdit = TextInputEditText(this).apply {
+            singleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        }
         passLayout.addView(passEdit)
         root.addView(passLayout, LinearLayout.LayoutParams(-1, -2))
+
         val button = MaterialButton(this).apply {
             text = "Sign in"
             isAllCaps = false
@@ -74,6 +89,20 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 0)
         }
         root.addView(button, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(24), 0, 0) })
+
+        userEdit.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                passEdit.requestFocus()
+                true
+            } else false
+        }
+        passEdit.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                button.performClick()
+                true
+            } else false
+        }
+
         button.setOnClickListener {
             val username = userEdit.text?.toString()?.trim().orEmpty()
             val password = passEdit.text?.toString().orEmpty()
