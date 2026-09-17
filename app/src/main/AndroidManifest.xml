@@ -3,8 +3,8 @@
     <application
         android:theme="@style/AppTheme"
         android:label="Miao Library"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:icon="@drawable/logo"
+        android:roundIcon="@drawable/logo"
         android:allowBackup="false"
         android:supportsRtl="true">
         <activity
