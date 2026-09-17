@@ -4,27 +4,151 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.widget.*
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); showLogin() }
+    private val gatewayBaseUrl = "https://api.miaolibrary.in"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        showLogin()
+    }
+
     private fun showLogin() {
-        val root = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER; setPadding(32,24,32,32); setBackgroundColor(Color.rgb(247,243,236)) }
-        val logo = ImageView(this).apply { setImageResource(R.drawable.logo); scaleType=ImageView.ScaleType.FIT_CENTER; contentDescription="Miao Library logo" }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(32, 24, 32, 32)
+            setBackgroundColor(Color.rgb(247, 243, 236))
+        }
+
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Miao Library logo"
+        }
         root.addView(logo, LinearLayout.LayoutParams(-1, 210))
-        val title=TextView(this).apply { text="Welcome to Miao Library"; textSize=25f; setTextColor(Color.rgb(28,45,63)); gravity=Gravity.CENTER; setTypeface(typeface,1) }
-        root.addView(title, LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,18,0,6)})
-        val subtitle=TextView(this).apply{text="Sign in to access your library account";textSize=14f;setTextColor(Color.DKGRAY);gravity=Gravity.CENTER}
-        root.addView(subtitle, LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,28)})
-        val user=TextInputLayout(this).apply{hint="Library username"}; val userEdit=TextInputEditText(this); user.addView(userEdit); root.addView(user, LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,12)})
-        val pass=TextInputLayout(this).apply{hint="Password"; endIconMode=TextInputLayout.END_ICON_PASSWORD_TOGGLE}; val passEdit=TextInputEditText(this); pass.addView(passEdit); root.addView(pass, LinearLayout.LayoutParams(-1,-2))
-        val button=MaterialButton(this).apply{text="SIGN IN"; setTextSize(14f); isAllCaps=false}; root.addView(button, LinearLayout.LayoutParams(-1,58).apply{setMargins(0,24,0,8)})
-        val forgot=TextView(this).apply{text="Forgot password?";gravity=Gravity.CENTER;setTextColor(Color.rgb(45,83,111));textSize=14f}; root.addView(forgot,LinearLayout.LayoutParams(-1,48))
-        button.setOnClickListener { Toast.makeText(this,"Gateway login will be connected next.",Toast.LENGTH_SHORT).show() }
+
+        val title = TextView(this).apply {
+            text = "Welcome to Miao Library"
+            textSize = 25f
+            setTextColor(Color.rgb(28, 45, 63))
+            gravity = Gravity.CENTER
+            setTypeface(typeface, 1)
+        }
+        root.addView(title, LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(0, 18, 0, 6)
+        })
+
+        val subtitle = TextView(this).apply {
+            text = "Sign in to access your library account"
+            textSize = 14f
+            setTextColor(Color.DKGRAY)
+            gravity = Gravity.CENTER
+        }
+        root.addView(subtitle, LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(0, 0, 0, 28)
+        })
+
+        val userLayout = TextInputLayout(this).apply {
+            hint = "Library username"
+        }
+        val userEdit = TextInputEditText(this)
+        userLayout.addView(userEdit)
+        root.addView(userLayout, LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(0, 0, 0, 12)
+        })
+
+        val passLayout = TextInputLayout(this).apply {
+            hint = "Password"
+            endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
+        }
+        val passEdit = TextInputEditText(this)
+        passLayout.addView(passEdit)
+        root.addView(passLayout, LinearLayout.LayoutParams(-1, -2))
+
+        val button = MaterialButton(this).apply {
+            text = "Sign in"
+            isAllCaps = false
+            textSize = 15f
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(0, 0, 0, 0)
+        }
+        root.addView(button, LinearLayout.LayoutParams(-1, 56).apply {
+            setMargins(0, 24, 0, 0)
+        })
+
+        button.setOnClickListener {
+            val username = userEdit.text?.toString()?.trim().orEmpty()
+            val password = passEdit.text?.toString().orEmpty()
+            if (username.isBlank() || password.isBlank()) {
+                Toast.makeText(this, "Enter your username and password.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            button.isEnabled = false
+            button.text = "Signing in…"
+            signIn(username, password, button)
+        }
+
         setContentView(root)
+    }
+
+    private fun signIn(username: String, password: String, button: MaterialButton) {
+        thread {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = (URL("$gatewayBaseUrl/login").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 15000
+                    readTimeout = 20000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("Accept", "application/json")
+                }
+                val body = JSONObject().apply {
+                    put("username", username)
+                    put("password", password)
+                }.toString()
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                val status = connection.responseCode
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                val response = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (status !in 200..299) throw Exception("Login failed ($status)")
+                val json = JSONObject(response)
+                val token = json.optString("access_token").ifBlank {
+                    json.optString("token")
+                }
+                if (token.isBlank()) throw Exception("Gateway did not return a session token")
+                getSharedPreferences("session", MODE_PRIVATE).edit()
+                    .putString("access_token", token)
+                    .putString("username", username)
+                    .apply()
+                runOnUiThread {
+                    button.isEnabled = true
+                    button.text = "Sign in"
+                    Toast.makeText(this, "Signed in successfully.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    button.isEnabled = true
+                    button.text = "Sign in"
+                    Toast.makeText(this, error.message ?: "Unable to sign in. Please try again.", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }
     }
 }
