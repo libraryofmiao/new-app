@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "in.miaolibrary.patron"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "in.miaolibrary.patron"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
     }
