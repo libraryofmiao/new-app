@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
-import android.view.Window
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
@@ -53,7 +52,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         window.statusBarColor = bg
-        window.navigationBarColor = bg
+        window.navigationBarColor = Color.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         if (token().isNullOrBlank()) login() else dashboard("Home")
     }
@@ -137,7 +136,8 @@ class MainActivity : AppCompatActivity() {
         fun apply(root: View, nav: View) {
             root.setOnApplyWindowInsetsListener { _, insets ->
                 val bottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
-                nav.setPadding(nav.paddingLeft, nav.paddingTop, nav.paddingRight, bottom + nav.paddingBottom)
+                root.setPadding(root.paddingLeft, root.paddingTop, root.paddingRight, bottom)
+                nav.setPadding(dp(10), dp(8), dp(10), dp(8))
                 insets
             }
             root.requestApplyInsets()
@@ -191,7 +191,18 @@ class MainActivity : AppCompatActivity() {
             val items = arrayFrom(response, "items", "results", "records", "books")
             if (items.length() == 0) output.addView(card(text("No catalogue records found.", 14f, muted))) else for (i in 0 until items.length()) {
                 val item = items.optJSONObject(i) ?: continue
-                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "author", "authors", "creator"), 14f, muted)); addView(text(first(item, "library", "location").ifBlank { "View bibliographic details" }, 13f, muted).apply { setPadding(0, dp(8), 0, 0) }) }
+                val box = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) })
+                    addView(text(first(item, "author", "authors", "creator").ifBlank { "Author not available" }, 14f, muted))
+                    addView(text("Library: " + first(item, "library", "location").ifBlank { "Not specified" }, 13f, muted).apply { setPadding(0, dp(8), 0, 0) })
+                    addView(text("Call number: " + first(item, "call_number", "callnumber", "shelfmark").ifBlank { "Not available" }, 13f, muted))
+                    addView(text("Availability: " + first(item, "availability", "status", "available").ifBlank { "Not available" }, 13f, muted))
+                    addView(text("ISBN: " + first(item, "isbn", "isbn13", "isbn10").ifBlank { "Not available" }, 13f, muted))
+                    addView(text("Publisher: " + first(item, "publisher", "publication").ifBlank { "Not available" }, 13f, muted))
+                    addView(text("Holdings: " + first(item, "holding_count", "copy_count", "holdings").ifBlank { "Not available" }, 13f, muted))
+                    addView(text("Tap for complete book details", 12f, ink).apply { setPadding(0, dp(12), 0, 0) })
+                }
                 val itemCard = card(box); itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
             }
         }}
@@ -209,7 +220,7 @@ class MainActivity : AppCompatActivity() {
         dashboard("Catalogue"); content.removeAllViews()
         val scroll = ScrollView(this); val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(10), dp(20), dp(30)) }
         body.addView(text("Book details", 25f).apply { setTypeface(typeface, 1) })
-        arrayOf("title", "subtitle", "author", "authors", "publisher", "publication", "publication_year", "year", "isbn", "call_number", "library", "location", "availability", "status", "barcode", "holding_count", "copy_count", "holdings", "item_type", "notes", "biblionumber").forEach { field ->
+        arrayOf("title", "subtitle", "author", "authors", "publisher", "publication", "publication_year", "year", "isbn", "isbn13", "isbn10", "call_number", "callnumber", "shelfmark", "library", "location", "availability", "status", "barcode", "holding_count", "copy_count", "holdings", "item_type", "notes", "biblionumber").forEach { field ->
             val value = first(item, field); if (value.isNotBlank()) { val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(field.replace('_', ' ').replaceFirstChar { it.uppercase() }, 12f, muted)); addView(text(value, 16f).apply { setPadding(0, dp(4), 0, 0) }) }; body.addView(card(row), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(9)) }) }
         }
         scroll.addView(body); content.addView(scroll)
@@ -220,7 +231,7 @@ class MainActivity : AppCompatActivity() {
         val currentOutput = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(currentOutput)
         request("/my-books", "GET", null, token()) { ok, response -> runOnUiThread {
             if (!ok) currentOutput.addView(card(text("Unable to load your books.", 14f, muted))) else {
-                val items = arrayFrom(response, "books", "items", "issues")
+                val items = arrayFrom(response, "books", "items", "issues", "current", "current_books")
                 if (items.length() == 0) currentOutput.addView(card(text("You have no currently issued books.", 14f, muted))) else records(items, currentOutput, true)
             }
         }}
@@ -230,7 +241,7 @@ class MainActivity : AppCompatActivity() {
         request("/issue-history", "GET", null, token()) { ok, response -> runOnUiThread {
             historyOutput.removeAllViews()
             if (!ok) historyOutput.addView(card(text("Unable to load issue history.", 14f, muted))) else {
-                val items = arrayFrom(response, "items", "history", "issues", "books")
+                val items = arrayFrom(response, "items", "history", "issues", "books", "previous_issues", "previousIssues", "returned_books", "past_issues")
                 if (items.length() == 0) historyOutput.addView(card(text("No previous issues found.", 14f, muted))) else records(items, historyOutput, false)
             }
         }}
@@ -239,9 +250,17 @@ class MainActivity : AppCompatActivity() {
     private fun records(items: JSONArray, output: LinearLayout, current: Boolean) {
         for (i in 0 until items.length()) {
             val item = items.optJSONObject(i) ?: continue
-            val date = first(item, if (current) "date_due" else "checkout_date", "due_date", "issued_date", "date_issued", "date_checkout")
-            val secondary = first(item, "library", "barcode", "returned_date", "checkin_date", "date_returned")
-            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "author", "authors"), 14f, muted)); addView(text((if (current) "Due: " else "Issued: ") + date.ifBlank { "Not available" }, 14f)); if (secondary.isNotBlank()) addView(text(secondary, 13f, muted).apply { setPadding(0, dp(6), 0, 0) }) }
+            val date = if (current) first(item, "date_due", "due_date", "date_due_formatted") else first(item, "checkout_date", "issued_date", "date_issued", "date_checkout", "date_checked_out")
+            val returned = first(item, "returned_date", "checkin_date", "date_returned", "return_date", "date_checked_in")
+            val secondary = first(item, "library", "location", "barcode", "call_number")
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) })
+                addView(text(first(item, "author", "authors").ifBlank { "Author not available" }, 14f, muted))
+                addView(text((if (current) "Due: " else "Issued: ") + date.ifBlank { "Not available" }, 14f))
+                if (!current && returned.isNotBlank()) addView(text("Returned: $returned", 14f))
+                if (secondary.isNotBlank()) addView(text(secondary, 13f, muted).apply { setPadding(0, dp(6), 0, 0) })
+            }
             output.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
         }
     }
