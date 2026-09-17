@@ -994,14 +994,7 @@ class MainActivity : AppCompatActivity() {
                 }
             )
         }
-    }
-
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any {
-                val value = item.optString(it, "").trim()
-                value.isNotBlank() && value != "null"
-            }) return true
+    }) return true
 
         val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
         if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
