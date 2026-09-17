@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
             hint = "Library username"
         }
         val userEdit = TextInputEditText(this).apply {
-            singleLine = true
+            setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_NEXT
         }
@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
             endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
         }
         val passEdit = TextInputEditText(this).apply {
-            singleLine = true
+            setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             imeOptions = EditorInfo.IME_ACTION_DONE
         }
