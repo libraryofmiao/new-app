@@ -149,6 +149,7 @@ class MainActivity : AppCompatActivity() {
         if (!current && !isReturnedIssue(item)) continue
         if (!current && !isReturnedIssue(item)) continue
         if (!current && !isReturnedIssue(item)) continue
+        if (!current && !isReturnedIssue(item)) continue
 
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -226,6 +227,15 @@ class MainActivity : AppCompatActivity() {
         )
     }
 }
+    private fun isReturnedIssue(item: JSONObject): Boolean {
+        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
+        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
+        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
+        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
+        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
+        return false
+    }
+
     private fun isReturnedIssue(item: JSONObject): Boolean {
         val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
         if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
