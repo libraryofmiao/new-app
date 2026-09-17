@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.Window
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
@@ -16,29 +17,273 @@ import java.net.URLEncoder
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
- private val gateway="https://api.miaolibrary.in"; private val bg=Color.rgb(248,245,239); private val ink=Color.rgb(27,43,58); private val muted=Color.rgb(105,112,117); private lateinit var content:FrameLayout
- private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
- private fun prefs()=getSharedPreferences("session",MODE_PRIVATE); private fun token()=prefs().getString("access_token",null); private fun user()=prefs().getString("username","Patron")?:"Patron"
- private fun tv(s:String,size:Float=16f,color:Int=ink)=TextView(this).apply{text=s;textSize=size;setTextColor(color)}
- private fun rounded(color:Int=Color.WHITE,r:Int=20)=GradientDrawable().apply{setColor(color);cornerRadius=dp(r).toFloat()}
- private fun card(v:View)=FrameLayout(this).apply{background=rounded();setPadding(dp(18),dp(16),dp(18),dp(16));addView(v,FrameLayout.LayoutParams(-1,-2))}
- private fun btn(s:String,primary:Boolean=true)=Button(this).apply{text=s;isAllCaps=false;textSize=14f;setTextColor(if(primary)Color.WHITE else ink);background=rounded(if(primary)ink else Color.WHITE,16)}
- private fun logo(h:Int)=ImageView(this).apply{setImageResource(R.drawable.logo);scaleType=ImageView.ScaleType.CENTER_INSIDE;adjustViewBounds=true;layoutParams=LinearLayout.LayoutParams(-1,dp(h))}
- override fun onCreate(b:Bundle?){super.onCreate(b);window.statusBarColor=bg;window.navigationBarColor=bg;window.decorView.systemUiVisibility=View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;if(token().isNullOrBlank())login() else dashboard("Home")}
- private fun login(){val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;setPadding(dp(28),dp(24),dp(28),dp(24));setBackgroundColor(bg)};val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL};box.addView(card(logo(120)),LinearLayout.LayoutParams(-1,dp(150)));box.addView(tv("Welcome to Miao Library",28f).apply{gravity=Gravity.CENTER;setTypeface(typeface,1)},LinearLayout.LayoutParams(-1,dp(70)));box.addView(tv("Your library, wherever you are",15f,muted).apply{gravity=Gravity.CENTER},LinearLayout.LayoutParams(-1,dp(38)));val u=EditText(this).apply{hint="Library username";setSingleLine();background=rounded();setPadding(dp(16),0,dp(16),0)};val p=EditText(this).apply{hint="Password";setSingleLine();inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD;background=rounded();setPadding(dp(16),0,dp(16),0)};box.addView(u,LinearLayout.LayoutParams(-1,dp(56)).apply{setMargins(0,dp(12),0,dp(10))});box.addView(p,LinearLayout.LayoutParams(-1,dp(56)));val go=btn("Sign in");box.addView(go,LinearLayout.LayoutParams(-1,dp(54)).apply{setMargins(0,dp(20),0,0)});box.addView(tv("Secure access to your library account",12f,muted).apply{gravity=Gravity.CENTER},LinearLayout.LayoutParams(-1,dp(42)));go.setOnClickListener{if(u.text.isBlank()||p.text.isBlank()){toast("Enter your username and password.");return@setOnClickListener};go.isEnabled=false;go.text="Signing in…";request("/login","POST",JSONObject().put("username",u.text.toString().trim()).put("password",p.text.toString()),null){ok,res->runOnUiThread{go.isEnabled=true;go.text="Sign in";if(!ok){toast("Login failed.");return@runOnUiThread};try{val j=JSONObject(res);val a=j.optString("access_token").ifBlank{j.optString("token")};prefs().edit().putString("access_token",a).putString("username",u.text.toString().trim()).apply();dashboard("Home")}catch(_:Exception){toast("Invalid gateway response.")}}}};root.addView(box,LinearLayout.LayoutParams(-1,-2));setContentView(root)}
- private fun dashboard(section:String){val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(bg)};val head=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(20),dp(16),dp(20),dp(10))};head.addView(ImageView(this).apply{setImageResource(R.drawable.logo);scaleType=ImageView.ScaleType.CENTER_INSIDE},LinearLayout.LayoutParams(dp(58),dp(58)));val h=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),0,0,0)};h.addView(tv("Miao Library",23f).apply{setTypeface(typeface,1)});h.addView(tv("Welcome back, ${user()}",13f,muted));head.addView(h,LinearLayout.LayoutParams(0,-2,1f));root.addView(head);content=FrameLayout(this);root.addView(content,LinearLayout.LayoutParams(-1,0,1f));val nav=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;setPadding(dp(10),dp(8),dp(10),dp(8));background=rounded(Color.WHITE,24);elevation=dp(8).toFloat()};listOf("⌂\nHome","⌕\nCatalogue","▣\nMy Books","●\nAccount").forEach{label->val name=label.substringAfter('\n');val x=TextView(this).apply{text=label;textSize=12f;gravity=Gravity.CENTER;setTextColor(if(name==section)Color.WHITE else ink);background=if(name==section)rounded(ink,16) else null;setOnClickListener{dashboard(name)}};nav.addView(x,LinearLayout.LayoutParams(0,dp(58),1f))};root.addView(nav,LinearLayout.LayoutParams(-1,dp(76)));setContentView(root);showSection(section)}
- private fun showSection(s:String){content.removeAllViews();val scroll=ScrollView(this);val body=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),dp(30))};body.addView(tv(s,26f).apply{setTypeface(typeface,1)});when(s){"Home"->home(body);"Catalogue"->catalogue(body);"My Books"->books(body);"Account"->account(body)};scroll.addView(body);content.addView(scroll)}
- private fun home(b:LinearLayout){b.addView(tv("A welcoming space for learning, discovery and connection",16f,muted).apply{setPadding(0,dp(8),0,dp(16))});b.addView(card(LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(tv("Explore your library",21f).apply{setTypeface(typeface,1)});addView(tv("Find books, follow your loans and stay connected with Miao Library.",14f,muted).apply{setPadding(0,dp(8),0,dp(4))})}),LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,dp(16))});val quick=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};val c=btn("Catalogue",false);val m=btn("My Books",false);quick.addView(c,LinearLayout.LayoutParams(0,dp(52),1f).apply{setMargins(0,0,dp(6),0)});quick.addView(m,LinearLayout.LayoutParams(0,dp(52),1f).apply{setMargins(dp(6),0,0,0)});c.setOnClickListener{dashboard("Catalogue")};m.setOnClickListener{dashboard("My Books")};b.addView(quick);b.addView(tv("Library updates",19f).apply{setTypeface(typeface,1);setPadding(0,dp(24),0,dp(10))});val loading=card(tv("Loading announcements…",14f,muted));b.addView(loading);request("/cms/content","GET",null,token()){ok,res->runOnUiThread{b.removeView(loading);if(!ok){b.addView(card(tv("Announcements are temporarily unavailable.",14f,muted)));return@runOnUiThread};val a=arrayFrom(res,"items","content","announcements");if(a.length()==0)b.addView(card(tv("No current announcements.",14f,muted))) else for(i in 0 until a.length()){val j=a.optJSONObject(i)?:continue;val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(tv(first(j,"title","name").ifBlank{"Announcement"},17f).apply{setTypeface(typeface,1)});addView(tv(first(j,"body","description","html","content"),14f,muted).apply{setPadding(0,dp(8),0,0)})};b.addView(card(box),LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,dp(12))})}}}}
- private fun catalogue(b:LinearLayout){val input=EditText(this).apply{hint="Search books, authors or subjects";setSingleLine();background=rounded();setPadding(dp(16),0,dp(16),0)};b.addView(input,LinearLayout.LayoutParams(-1,dp(56)).apply{setMargins(0,dp(14),0,dp(10))});val go=btn("Search catalogue");b.addView(go,LinearLayout.LayoutParams(-1,dp(52)));val out=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};b.addView(out,LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,dp(18),0,0)});go.setOnClickListener{search(input.text.toString(),out,go)};search("",out,go)}
- private fun search(q:String,out:LinearLayout,go:Button){go.isEnabled=false;out.removeAllViews();out.addView(tv("Searching catalogue…",14f,muted));request("/catalogue/search?q="+URLEncoder.encode(q,"UTF-8"),"GET",null,token()){ok,res->runOnUiThread{go.isEnabled=true;out.removeAllViews();if(!ok){out.addView(card(tv("Catalogue unavailable.",14f,muted)));return@runOnUiThread};val a=arrayFrom(res,"items","results","records","books");if(a.length()==0)out.addView(card(tv("No catalogue records found.",14f,muted))) else for(i in 0 until a.length()){val j=a.optJSONObject(i)?:continue;val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(tv(first(j,"title","name").ifBlank{"Untitled"},18f).apply{setTypeface(typeface,1)});addView(tv(first(j,"author","authors","creator"),14f,muted));addView(tv(first(j,"library","location").ifBlank{"View bibliographic details"},13f,muted).apply{setPadding(0,dp(8),0,0)})};val v=card(box);v.setOnClickListener{open(j)};out.addView(v,LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,dp(12))})}}}}
- private fun open(j:JSONObject){val id=first(j,"biblionumber","biblio_id","id");if(id.isBlank()){details(j);return};request("/book-details/$id","GET",null,token()){ok,res->runOnUiThread{if(ok)try{val x=JSONObject(res);details(x.optJSONObject("book")?:x.optJSONObject("record")?:x)}catch(_:Exception){details(j)}else details(j)}}}
- private fun details(j:JSONObject){dashboard("Catalogue");content.removeAllViews();val s=ScrollView(this);val b=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(10),dp(20),dp(30))};b.addView(tv("Book details",25f).apply{setTypeface(typeface,1)});arrayOf("title","subtitle","author","authors","publisher","publication","publication_year","year","isbn","call_number","library","location","availability","status","barcode","holding_count","copy_count","holdings","item_type","notes","biblionumber").forEach{f->val v=first(j,f);if(v.isNotBlank()){val row=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(tv(f.replace('_',' ').replaceFirstChar{it.uppercase()},12f,muted));addView(tv(v,16f).apply{setPadding(0,dp(4),0,0)})};b.addView(card(row),LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,dp(9))})}};s.addView(b);content.addView(s)}
- private fun books(b:LinearLayout){val history=btn("Issue History / Previous Issues",false);b.addView(history,LinearLayout.LayoutParams(-1,dp(52)).apply{setMargins(0,dp(14),0,dp(14))});val out=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};b.addView(out);history.setOnClickListener{history(out)};request("/my-books","GET",null,token()){ok,res->runOnUiThread{if(!ok){out.addView(card(tv("Unable to load your books.",14f,muted)));return@runOnUiThread};val a=arrayFrom(res,"books","items","issues");if(a.length()==0)out.addView(card(tv("You have no currently issued books.",14f,muted))) else records(a,out,true)}}}
- private fun history(out:LinearLayout){out.removeAllViews();out.addView(tv("Loading issue history…",14f,muted));request("/issue-history","GET",null,token()){ok,res->runOnUiThread{out.removeAllViews();if(!ok){out.addView(card(tv("Unable to load issue history.",14f,muted)));return@runOnUiThread};val a=arrayFrom(res,"items","history","issues","books");if(a.length()==0)out.addView(card(tv("No previous issues found.",14f,muted))) else records(a,out,false)}}}
- private fun records(a:JSONArray,out:LinearLayout,current:Boolean){for(i in 0 until a.length()){val j=a.optJSONObject(i)?:continue;val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(tv(first(j,"title","name").ifBlank{"Untitled"},18f).apply{setTypeface(typeface,1)});addView(tv(first(j,"author","authors"),14f,muted));addView(tv((if(current)"Due: " else "Issued: ")+first(j,"date_due","due_date","checkout_date","issued_date").ifBlank{"Not available"},14f));addView(tv(first(j,"library","barcode","returned_date","checkin_date"),13f,muted).apply{setPadding(0,dp(6),0,0)})};out.addView(card(box),LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,dp(12))})}}
- private fun account(b:LinearLayout){b.addView(card(LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(tv("Library account",20f).apply{setTypeface(typeface,1)});addView(tv(user(),16f,muted).apply{setPadding(0,dp(8),0,0)})}),LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,dp(14),0,dp(14))});val my=btn("View My Books",false);b.addView(my,LinearLayout.LayoutParams(-1,dp(52)).apply{setMargins(0,0,0,dp(10))});my.setOnClickListener{dashboard("My Books")};val out=btn("Sign out");b.addView(out,LinearLayout.LayoutParams(-1,dp(52)));out.setOnClickListener{prefs().edit().clear().apply();login()}}
- private fun request(path:String,method:String,body:JSONObject?,bearer:String?,done:(Boolean,String)->Unit){thread{try{val c=URL(gateway+path).openConnection() as HttpURLConnection;c.requestMethod=method;c.connectTimeout=15000;c.readTimeout=20000;c.setRequestProperty("Accept","application/json");if(!bearer.isNullOrBlank())c.setRequestProperty("Authorization","Bearer $bearer");if(body!=null){c.doOutput=true;c.setRequestProperty("Content-Type","application/json");c.outputStream.use{it.write(body.toString().toByteArray())}};val code=c.responseCode;val stream=if(code in 200..299)c.inputStream else c.errorStream;done(code in 200..299,stream?.bufferedReader()?.readText()?:"HTTP $code")}catch(e:Exception){done(false,e.message?:"Network error")}}}
- private fun first(j:JSONObject,vararg keys:String):String{for(k in keys){if(j.has(k)&&!j.isNull(k)){val v=j.opt(k);if(v is JSONArray)return v.toString();if(v is JSONObject)return v.toString();if(v.toString().isNotBlank())return v.toString()}};return ""}
- private fun arrayFrom(s:String,vararg keys:String):JSONArray{val j=JSONObject(s);for(k in keys){val a=j.optJSONArray(k);if(a!=null)return a};return if(j.has("data")&&j.opt("data") is JSONArray)j.getJSONArray("data") else JSONArray()}
- private fun toast(s:String)=runOnUiThread{Toast.makeText(this,s,Toast.LENGTH_SHORT).show()}
+    private val gateway = "https://api.miaolibrary.in"
+    private val bg = Color.rgb(248, 245, 239)
+    private val ink = Color.rgb(27, 43, 58)
+    private val muted = Color.rgb(105, 112, 117)
+    private lateinit var content: FrameLayout
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun prefs() = getSharedPreferences("session", MODE_PRIVATE)
+    private fun token() = prefs().getString("access_token", null)
+    private fun username() = prefs().getString("username", "Patron") ?: "Patron"
+    private fun text(value: String, size: Float = 16f, color: Int = ink) = TextView(this).apply {
+        this.text = value
+        textSize = size
+        setTextColor(color)
+    }
+    private fun shape(color: Int = Color.WHITE, radius: Int = 20) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
+    private fun card(view: View) = FrameLayout(this).apply {
+        background = shape()
+        setPadding(dp(18), dp(16), dp(18), dp(16))
+        addView(view, FrameLayout.LayoutParams(-1, -2))
+    }
+    private fun button(label: String, primary: Boolean = true) = Button(this).apply {
+        text = label
+        isAllCaps = false
+        textSize = 14f
+        setTextColor(if (primary) Color.WHITE else ink)
+        background = shape(if (primary) ink else Color.WHITE, 16)
+        stateListAnimator = null
+    }
+
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state)
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        if (token().isNullOrBlank()) login() else dashboard("Home")
+    }
+
+    private fun login() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(28), dp(24), dp(28), dp(24))
+            setBackgroundColor(bg)
+        }
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+        val image = ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_INSIDE }
+        box.addView(card(image), LinearLayout.LayoutParams(-1, dp(150)))
+        box.addView(text("Welcome to Miao Library", 28f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1) }, LinearLayout.LayoutParams(-1, dp(70)))
+        box.addView(text("Your library, wherever you are", 15f, muted).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(-1, dp(38)))
+        val user = EditText(this).apply { hint = "Library username"; setSingleLine(); background = shape(); setPadding(dp(16), 0, dp(16), 0) }
+        val pass = EditText(this).apply { hint = "Password"; setSingleLine(); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD; background = shape(); setPadding(dp(16), 0, dp(16), 0) }
+        box.addView(user, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(12), 0, dp(10)) })
+        box.addView(pass, LinearLayout.LayoutParams(-1, dp(56)))
+        val signIn = button("Sign in")
+        box.addView(signIn, LinearLayout.LayoutParams(-1, dp(54)).apply { setMargins(0, dp(20), 0, 0) })
+        box.addView(text("Secure access to your library account", 12f, muted).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(-1, dp(42)))
+        signIn.setOnClickListener {
+            if (user.text.isBlank() || pass.text.isBlank()) { toast("Enter your username and password."); return@setOnClickListener }
+            signIn.isEnabled = false; signIn.text = "Signing in…"
+            request("/login", "POST", JSONObject().put("username", user.text.toString().trim()).put("password", pass.text.toString()), null) { ok, response ->
+                runOnUiThread {
+                    signIn.isEnabled = true; signIn.text = "Sign in"
+                    if (!ok) { toast("Login failed."); return@runOnUiThread }
+                    try {
+                        val j = JSONObject(response)
+                        val access = j.optString("access_token").ifBlank { j.optString("token") }
+                        prefs().edit().putString("access_token", access).putString("username", user.text.toString().trim()).apply()
+                        dashboard("Home")
+                    } catch (_: Exception) { toast("Invalid gateway response.") }
+                }
+            }
+        }
+        root.addView(box, LinearLayout.LayoutParams(-1, -2))
+        setContentView(root)
+    }
+
+    private fun dashboard(section: String) {
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(bg) }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(10))
+        }
+        header.addView(ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_INSIDE }, LinearLayout.LayoutParams(dp(58), dp(58)))
+        val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0) }
+        heading.addView(text("Miao Library", 23f).apply { setTypeface(typeface, 1) })
+        heading.addView(text("Welcome back, ${username()}", 13f, muted))
+        header.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(header)
+
+        content = FrameLayout(this)
+        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setPadding(dp(10), dp(8), dp(10), dp(8)); background = shape(Color.WHITE, 24); elevation = dp(8).toFloat()
+        }
+        listOf("⌂\nHome", "⌕\nCatalogue", "▣\nMy Books", "●\nAccount").forEach { item ->
+            val name = item.substringAfter('\n')
+            val tab = TextView(this).apply {
+                text = item; textSize = 12f; gravity = Gravity.CENTER
+                setTextColor(if (name == section) Color.WHITE else ink)
+                background = if (name == section) shape(ink, 16) else null
+                setPadding(0, dp(4), 0, dp(4))
+                setOnClickListener { dashboard(name) }
+            }
+            nav.addView(tab, LinearLayout.LayoutParams(0, dp(58), 1f))
+        }
+        root.addView(nav, LinearLayout.LayoutParams(-1, dp(76)))
+        ViewCompatInsets.apply(root, nav)
+        setContentView(root)
+        showSection(section)
+    }
+
+    private object ViewCompatInsets {
+        fun apply(root: View, nav: View) {
+            root.setOnApplyWindowInsetsListener { _, insets ->
+                val bottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+                nav.setPadding(nav.paddingLeft, nav.paddingTop, nav.paddingRight, bottom + nav.paddingBottom)
+                insets
+            }
+            root.requestApplyInsets()
+        }
+    }
+
+    private fun showSection(section: String) {
+        content.removeAllViews()
+        val scroll = ScrollView(this)
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(30)) }
+        body.addView(text(section, 26f).apply { setTypeface(typeface, 1) })
+        when (section) { "Home" -> home(body); "Catalogue" -> catalogue(body); "My Books" -> books(body); "Account" -> account(body) }
+        scroll.addView(body); content.addView(scroll)
+    }
+
+    private fun home(body: LinearLayout) {
+        body.addView(text("A welcoming space for learning, discovery and connection", 16f, muted).apply { setPadding(0, dp(8), 0, dp(16)) })
+        body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Explore your library", 21f).apply { setTypeface(typeface, 1) }); addView(text("Find books, follow your loans and stay connected with Miao Library.", 14f, muted).apply { setPadding(0, dp(8), 0, dp(4)) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(16)) })
+        val quick = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val catalogue = button("Catalogue", false); val books = button("My Books", false)
+        quick.addView(catalogue, LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(0, 0, dp(6), 0) })
+        quick.addView(books, LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(dp(6), 0, 0, 0) })
+        catalogue.setOnClickListener { dashboard("Catalogue") }; books.setOnClickListener { dashboard("My Books") }; body.addView(quick)
+        body.addView(text("Library updates", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) })
+        val loading = card(text("Loading announcements…", 14f, muted)); body.addView(loading)
+        request("/cms/content", "GET", null, token()) { ok, response -> runOnUiThread {
+            body.removeView(loading)
+            if (!ok) { body.addView(card(text("Announcements are temporarily unavailable.", 14f, muted))); return@runOnUiThread }
+            val items = arrayFrom(response, "items", "content", "announcements")
+            if (items.length() == 0) body.addView(card(text("No current announcements.", 14f, muted))) else for (i in 0 until items.length()) {
+                val item = items.optJSONObject(i) ?: continue
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Announcement" }, 17f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "body", "description", "html", "content"), 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }
+                body.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
+            }
+        }}
+    }
+
+    private fun catalogue(body: LinearLayout) {
+        val input = EditText(this).apply { hint = "Search books, authors or subjects"; setSingleLine(); background = shape(); setPadding(dp(16), 0, dp(16), 0) }
+        body.addView(input, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(14), 0, dp(10)) })
+        val search = button("Search catalogue"); body.addView(search, LinearLayout.LayoutParams(-1, dp(52)))
+        val output = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(output, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(18), 0, 0) })
+        search.setOnClickListener { searchCatalogue(input.text.toString(), output, search) }; searchCatalogue("", output, search)
+    }
+
+    private fun searchCatalogue(query: String, output: LinearLayout, search: Button) {
+        search.isEnabled = false; output.removeAllViews(); output.addView(text("Searching catalogue…", 14f, muted))
+        request("/catalogue/search?q=" + URLEncoder.encode(query, "UTF-8"), "GET", null, token()) { ok, response -> runOnUiThread {
+            search.isEnabled = true; output.removeAllViews()
+            if (!ok) { output.addView(card(text("Catalogue unavailable.", 14f, muted))); return@runOnUiThread }
+            val items = arrayFrom(response, "items", "results", "records", "books")
+            if (items.length() == 0) output.addView(card(text("No catalogue records found.", 14f, muted))) else for (i in 0 until items.length()) {
+                val item = items.optJSONObject(i) ?: continue
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "author", "authors", "creator"), 14f, muted)); addView(text(first(item, "library", "location").ifBlank { "View bibliographic details" }, 13f, muted).apply { setPadding(0, dp(8), 0, 0) }) }
+                val itemCard = card(box); itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
+            }
+        }}
+    }
+
+    private fun openDetails(item: JSONObject) {
+        val id = first(item, "biblionumber", "biblio_id", "id")
+        if (id.isBlank()) { details(item); return }
+        request("/book-details/$id", "GET", null, token()) { ok, response -> runOnUiThread {
+            if (ok) try { val j = JSONObject(response); details(j.optJSONObject("book") ?: j.optJSONObject("record") ?: j) } catch (_: Exception) { details(item) } else details(item)
+        }}
+    }
+
+    private fun details(item: JSONObject) {
+        dashboard("Catalogue"); content.removeAllViews()
+        val scroll = ScrollView(this); val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(10), dp(20), dp(30)) }
+        body.addView(text("Book details", 25f).apply { setTypeface(typeface, 1) })
+        arrayOf("title", "subtitle", "author", "authors", "publisher", "publication", "publication_year", "year", "isbn", "call_number", "library", "location", "availability", "status", "barcode", "holding_count", "copy_count", "holdings", "item_type", "notes", "biblionumber").forEach { field ->
+            val value = first(item, field); if (value.isNotBlank()) { val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(field.replace('_', ' ').replaceFirstChar { it.uppercase() }, 12f, muted)); addView(text(value, 16f).apply { setPadding(0, dp(4), 0, 0) }) }; body.addView(card(row), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(9)) }) }
+        }
+        scroll.addView(body); content.addView(scroll)
+    }
+
+    private fun books(body: LinearLayout) {
+        body.addView(text("Currently issued", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(14), 0, dp(10)) })
+        val currentOutput = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(currentOutput)
+        request("/my-books", "GET", null, token()) { ok, response -> runOnUiThread {
+            if (!ok) currentOutput.addView(card(text("Unable to load your books.", 14f, muted))) else {
+                val items = arrayFrom(response, "books", "items", "issues")
+                if (items.length() == 0) currentOutput.addView(card(text("You have no currently issued books.", 14f, muted))) else records(items, currentOutput, true)
+            }
+        }}
+        body.addView(text("Previous issues", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) })
+        val historyOutput = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(historyOutput)
+        historyOutput.addView(card(text("Loading previous issues…", 14f, muted)))
+        request("/issue-history", "GET", null, token()) { ok, response -> runOnUiThread {
+            historyOutput.removeAllViews()
+            if (!ok) historyOutput.addView(card(text("Unable to load issue history.", 14f, muted))) else {
+                val items = arrayFrom(response, "items", "history", "issues", "books")
+                if (items.length() == 0) historyOutput.addView(card(text("No previous issues found.", 14f, muted))) else records(items, historyOutput, false)
+            }
+        }}
+    }
+
+    private fun records(items: JSONArray, output: LinearLayout, current: Boolean) {
+        for (i in 0 until items.length()) {
+            val item = items.optJSONObject(i) ?: continue
+            val date = first(item, if (current) "date_due" else "checkout_date", "due_date", "issued_date", "date_issued", "date_checkout")
+            val secondary = first(item, "library", "barcode", "returned_date", "checkin_date", "date_returned")
+            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "author", "authors"), 14f, muted)); addView(text((if (current) "Due: " else "Issued: ") + date.ifBlank { "Not available" }, 14f)); if (secondary.isNotBlank()) addView(text(secondary, 13f, muted).apply { setPadding(0, dp(6), 0, 0) }) }
+            output.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
+        }
+    }
+
+    private fun account(body: LinearLayout) {
+        body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Library account", 20f).apply { setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(14)) })
+        val my = button("View My Books", false); body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
+        val logout = button("Sign out"); body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
+    }
+
+    private fun request(path: String, method: String, body: JSONObject?, bearer: String?, done: (Boolean, String) -> Unit) {
+        thread {
+            try {
+                val connection = URL(gateway + path).openConnection() as HttpURLConnection
+                connection.requestMethod = method; connection.connectTimeout = 15000; connection.readTimeout = 20000
+                connection.setRequestProperty("Accept", "application/json")
+                if (!bearer.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $bearer")
+                if (body != null) { connection.doOutput = true; connection.setRequestProperty("Content-Type", "application/json"); connection.outputStream.use { it.write(body.toString().toByteArray()) } }
+                val code = connection.responseCode; val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                done(code in 200..299, stream?.bufferedReader()?.readText() ?: "HTTP $code")
+            } catch (error: Exception) { done(false, error.message ?: "Network error") }
+        }
+    }
+
+    private fun first(obj: JSONObject, vararg keys: String): String {
+        for (key in keys) if (obj.has(key) && !obj.isNull(key)) { val value = obj.opt(key); if (value is JSONArray || value is JSONObject) return value.toString(); if (value.toString().isNotBlank()) return value.toString() }
+        return ""
+    }
+
+    private fun arrayFrom(raw: String, vararg keys: String): JSONArray {
+        return try { findArray(JSONObject(raw), keys.toSet()) ?: JSONArray() } catch (_: Exception) { JSONArray() }
+    }
+
+    private fun findArray(value: Any?, wanted: Set<String>): JSONArray? {
+        if (value is JSONObject) {
+            for (key in wanted) value.optJSONArray(key)?.let { return it }
+            val names = value.keys(); while (names.hasNext()) { val found = findArray(value.opt(names.next()), wanted); if (found != null) return found }
+        } else if (value is JSONArray) {
+            for (i in 0 until value.length()) { val found = findArray(value.opt(i), wanted); if (found != null) return found }
+        }
+        return null
+    }
+
+    private fun toast(message: String) = runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
 }
