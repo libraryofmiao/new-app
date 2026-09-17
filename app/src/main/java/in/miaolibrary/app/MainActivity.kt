@@ -118,11 +118,110 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadHistory(output: LinearLayout) {
-        output.removeAllViews(); output.addView(card(text("Loading previous issues…", 14f, muted))); request("/issue-history", "GET", null, token()) { ok, response -> runOnUiThread { output.removeAllViews(); if (!ok) { output.addView(card(text("Unable to load issue history.", 14f, muted))); return@runOnUiThread }; val items = arrayFrom(response, "items", "history", "issues", "books"); if (items.length() == 0) { output.addView(card(text("No previous issues found.", 14f, muted))) } else records(items, output, false) } }
+        output.removeAllViews(); output.addView(card(text("Loading previous issues…", 14f, muted))); request("/issue-history", "GET", null, token()) { ok, response -> runOnUiThread { output.removeAllViews(); if (!ok) { output.addView(card(text("Unable to load issue history.", 14f, muted))); return@runOnUiThread }; val items = arrayFrom(
+    response,
+    "items",
+    "history",
+    "issues",
+    "books",
+    "previous_issues",
+    "previousIssues",
+    "returned_books",
+    "past_issues",
+    "circulation_history",
+    "circulationHistory",
+    "issue_history",
+    "issueHistory",
+    "results",
+    "records",
+    "data"
+); if (items.length() == 0) { output.addView(card(text("No previous issues found.", 14f, muted))) } else records(items, output, false) } }
     }
 
-    private fun records(items: JSONArray, output: LinearLayout, current: Boolean) { for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 17f).apply { setTypeface(typeface, 1) }); addIfPresent(this, "Author", item, "author"); addIfPresent(this, "Library", item, "library"); if (current) { addIfPresent(this, "Due date", item, "date_due"); addIfPresent(this, "Checkout date", item, "checkout_date") } else { addIfPresent(this, "Issued date", item, "checkout_date"); addIfPresent(this, "Returned date", item, "date_returned"); addIfPresent(this, "Check-in date", item, "checkin_date") }; addIfPresent(this, "Barcode", item, "barcode") }; output.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } }
+    private fun records(
+    items: JSONArray,
+    output: LinearLayout,
+    current: Boolean
+) {
+    for (i in 0 until items.length()) {
+        val item = items.optJSONObject(i) ?: continue
 
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+
+            addView(
+                text(
+                    first(item, "title", "name").ifBlank { "Untitled" },
+                    17f
+                ).apply {
+                    setTypeface(typeface, 1)
+                }
+            )
+
+            addIfPresent(this, "Author", item, "author")
+            addIfPresent(this, "Library", item, "library")
+
+            addFirstPresent(
+                this,
+                "Issued date",
+                item,
+                "checkout_date",
+                "date_issued",
+                "issued_date",
+                "issue_date",
+                "date_checkout"
+            )
+
+            addFirstPresent(
+                this,
+                "Due date",
+                item,
+                "date_due",
+                "due_date",
+                "duedate",
+                "due"
+            )
+
+            addFirstPresent(
+                this,
+                "Renewed date",
+                item,
+                "date_renewed",
+                "renewed_date",
+                "renewal_date",
+                "renewed_until"
+            )
+
+            addFirstPresent(
+                this,
+                "Renewals",
+                item,
+                "renewals",
+                "renewal_count"
+            )
+
+            addFirstPresent(
+                this,
+                "Returned date",
+                item,
+                "date_returned",
+                "returned_date",
+                "return_date",
+                "checkin_date",
+                "date_checkin"
+            )
+
+            addIfPresent(this, "Barcode", item, "barcode")
+        }
+
+        output.addView(
+            card(box),
+            LinearLayout.LayoutParams(-1, -2).apply {
+                setMargins(0, 0, 0, dp(12))
+            }
+        )
+    }
+}
     private fun account(body: LinearLayout) { body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Library account", 20f).apply { setTypeface(typeface, 1) }); addView(text(username(), 15f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(14)) }); val my = button("View my books", false); body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }; val logout = button("Log out"); body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() } }
 
     private fun displayValue(item: JSONObject, key: String): String { val value = item.opt(key) ?: return ""; if (value is JSONArray) return prettyArray(value); if (value is JSONObject) return value.toString(); return value.toString().trim() }
