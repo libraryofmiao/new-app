@@ -16,95 +16,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Patch history identity matching
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("app/src/main/java/in/miaolibrary/app/MainActivity.kt")
-          s = path.read_text()
-          start = s.index("    private fun isCurrentIssue(item: JSONObject): Boolean {")
-          end = s.index("    private fun isReturnedIssue(item: JSONObject): Boolean {", start)
-          replacement = '''    private fun isCurrentIssue(item: JSONObject): Boolean {
-              if (currentIssueKeys.isEmpty()) return false
-
-              val issueId = first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId")
-              if (issueId.isNotBlank() && currentIssueKeys.contains("issue:$issueId")) return true
-
-              return issueFingerprints(item).any { currentIssueKeys.contains(it) }
-          }
-
-          private fun issueKeys(item: JSONObject): Set<String> {
-              val keys = mutableSetOf<String>()
-
-              fun add(prefix: String, value: String) {
-                  val v = value.trim()
-                  if (v.isNotBlank() && v != "null") keys.add("$prefix:$v")
-              }
-
-              val issueId = first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId")
-              if (issueId.isNotBlank()) add("issue", issueId)
-
-              keys.addAll(issueFingerprints(item))
-              return keys
-          }
-
-          private fun issueFingerprints(item: JSONObject): Set<String> {
-              val result = mutableSetOf<String>()
-
-              fun value(vararg names: String): String = first(item, *names).trim()
-
-              fun datePart(raw: String): String {
-                  val v = raw.trim().lowercase()
-                  val iso = Regex("\\\\d{4}[-/]\\\\d{2}[-/]\\\\d{2}").find(v)?.value
-                  if (iso != null) return iso.replace('/', '-')
-                  val dmy = Regex("\\\\d{2}[-/]\\\\d{2}[-/]\\\\d{4}").find(v)?.value
-                  if (dmy != null) {
-                      val p = dmy.split('-', '/')
-                      return "${p[2]}-${p[1]}-${p[0]}"
-                  }
-                  return v.replace(Regex("[^a-z0-9]"), "")
-              }
-
-              val barcode = value("barcode", "item_barcode", "itemBarcode")
-              val title = value("title", "name", "book_title", "bookTitle")
-              val author = value("author", "authors", "creator")
-              val issued = value("checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout", "checkoutDate", "issuedDate")
-              val due = value("date_due", "due_date", "duedate", "due", "dueDate")
-
-              val issuedDate = datePart(issued)
-              val dueDate = datePart(due)
-              val cleanBarcode = barcode.lowercase().replace(Regex("[^a-z0-9]"), "")
-              val cleanTitle = title.lowercase().replace(Regex("[^a-z0-9]"), "")
-              val cleanAuthor = author.lowercase().replace(Regex("[^a-z0-9]"), "")
-
-              if (cleanBarcode.isNotBlank() && issuedDate.isNotBlank() && dueDate.isNotBlank()) {
-                  result.add("loan:$cleanBarcode|$issuedDate|$dueDate")
-              }
-              if (cleanBarcode.isNotBlank() && issuedDate.isNotBlank()) {
-                  result.add("loan-issued:$cleanBarcode|$issuedDate")
-              }
-              if (cleanBarcode.isNotBlank() && dueDate.isNotBlank()) {
-                  result.add("loan-due:$cleanBarcode|$dueDate")
-              }
-              if (cleanTitle.isNotBlank() && issuedDate.isNotBlank() && dueDate.isNotBlank()) {
-                  result.add("title-loan:$cleanTitle|$cleanAuthor|$issuedDate|$dueDate")
-              }
-
-              return result
-          }
-
-'''
-          s = s[:start] + replacement + s[end:]
-          path.write_text(s)
-          PY
+        env:
+          REPLACEMENT_B64: ICAgIHByaXZhdGUgZnVuIGlzQ3VycmVudElzc3VlKGl0ZW06IEpTT05PYmplY3QpOiBCb29sZWFuIHsKICAgICAgICBpZiAoY3VycmVudElzc3VlS2V5cy5pc0VtcHR5KCkpIHJldHVybiBmYWxzZQoKICAgICAgICB2YWwgaXNzdWVJZCA9IGZpcnN0KGl0ZW0sICJpc3N1ZV9pZCIsICJpc3N1ZWlkIiwgImlzc3VlSWQiLCAiY2hlY2tvdXRfaWQiLCAiY2hlY2tvdXRJZCIsICJsb2FuX2lkIiwgImxvYW5JZCIpCiAgICAgICAgaWYgKGlzc3VlSWQuaXNOb3RCbGFuaygpICYmIGN1cnJlbnRJc3N1ZUtleXMuY29udGFpbnMoImlzc3VlOiRpc3N1ZUlkIikpIHJldHVybiB0cnVlCgogICAgICAgIHJldHVybiBpc3N1ZUZpbmdlcnByaW50cyhpdGVtKS5hbnkgeyBjdXJyZW50SXNzdWVLZXlzLmNvbnRhaW5zKGl0KSB9CiAgICB9CgogICAgcHJpdmF0ZSBmdW4gaXNzdWVLZXlzKGl0ZW06IEpTT05PYmplY3QpOiBTZXQ8U3RyaW5nPiB7CiAgICAgICAgdmFsIGtleXMgPSBtdXRhYmxlU2V0T2Y8U3RyaW5nPigpCgogICAgICAgIGZ1biBhZGQocHJlZml4OiBTdHJpbmcsIHZhbHVlOiBTdHJpbmcpIHsKICAgICAgICAgICAgdmFsIHYgPSB2YWx1ZS50cmltKCkKICAgICAgICAgICAgaWYgKHYuaXNOb3RCbGFuaygpICYmIHYgIT0gIm51bGwiKSBrZXlzLmFkZCgiJHByZWZpeDokdiIpCiAgICAgICAgfQoKICAgICAgICB2YWwgaXNzdWVJZCA9IGZpcnN0KGl0ZW0sICJpc3N1ZV9pZCIsICJpc3N1ZWlkIiwgImlzc3VlSWQiLCAiY2hlY2tvdXRfaWQiLCAiY2hlY2tvdXRJZCIsICJsb2FuX2lkIiwgImxvYW5JZCIpCiAgICAgICAgaWYgKGlzc3VlSWQuaXNOb3RCbGFuaygpKSBhZGQoImlzc3VlIiwgaXNzdWVJZCkKCiAgICAgICAga2V5cy5hZGRBbGwoaXNzdWVGaW5nZXJwcmludHMoaXRlbSkpCiAgICAgICAgcmV0dXJuIGtleXMKICAgIH0KCiAgICBwcml2YXRlIGZ1biBpc3N1ZUZpbmdlcnByaW50cyhpdGVtOiBKU09OT2JqZWN0KTogU2V0PFN0cmluZz4gewogICAgICAgIHZhbCByZXN1bHQgPSBtdXRhYmxlU2V0T2Y8U3RyaW5nPigpCgogICAgICAgIGZ1biB2YWx1ZSh2YXJhcmcgbmFtZXM6IFN0cmluZyk6IFN0cmluZyA9IGZpcnN0KGl0ZW0sICpuYW1lcykudHJpbSgpCgogICAgICAgIGZ1biBkYXRlUGFydChyYXc6IFN0cmluZyk6IFN0cmluZyB7CiAgICAgICAgICAgIHZhbCB2ID0gcmF3LnRyaW0oKS5sb3dlcmNhc2UoKQogICAgICAgICAgICB2YWwgaXNvID0gUmVnZXgoIlxkezR9Wy0vXVxkezJ9Wy0vXVxkezJ9IikuZmluZCh2KT8udmFsdWUKICAgICAgICAgICAgaWYgKGlzbyAhPSBudWxsKSByZXR1cm4gaXNvLnJlcGxhY2UoJy8nLCAnLScpCiAgICAgICAgICAgIHZhbCBkbXkgPSBSZWdleCgiXGR7Mn1bLS9dXGR7Mn1bLS9dXGR7NH0iKS5maW5kKHYpPy52YWx1ZQogICAgICAgICAgICBpZiAoZG15ICE9IG51bGwpIHsKICAgICAgICAgICAgICAgIHZhbCBwID0gZG15LnNwbGl0KCctJywgJy8nKQogICAgICAgICAgICAgICAgcmV0dXJuICIke3BbMl19LSR7cFsxXX0tJHtwWzBdfSIKICAgICAgICAgICAgfQogICAgICAgICAgICByZXR1cm4gdi5yZXBsYWNlKFJlZ2V4KCJbXmEtejAtOV0iKSwgIiIpCiAgICAgICAgfQoKICAgICAgICB2YWwgYmFyY29kZSA9IHZhbHVlKCJiYXJjb2RlIiwgIml0ZW1fYmFyY29kZSIsICJpdGVtQmFyY29kZSIpCiAgICAgICAgdmFsIHRpdGxlID0gdmFsdWUoInRpdGxlIiwgIm5hbWUiLCAiYm9va190aXRsZSIsICJib29rVGl0bGUiKQogICAgICAgIHZhbCBhdXRob3IgPSB2YWx1ZSgiYXV0aG9yIiwgImF1dGhvcnMiLCAiY3JlYXRvciIpCiAgICAgICAgdmFsIGlzc3VlZCA9IHZhbHVlKCJjaGVja291dF9kYXRlIiwgImRhdGVfaXNzdWVkIiwgImlzc3VlZF9kYXRlIiwgImlzc3VlX2RhdGUiLCAiZGF0ZV9jaGVja291dCIsICJjaGVja291dERhdGUiLCAiaXNzdWVkRGF0ZSIpCiAgICAgICAgdmFsIGR1ZSA9IHZhbHVlKCJkYXRlX2R1ZSIsICJkdWVfZGF0ZSIsICJkdWVkYXRlIiwgImR1ZSIsICJkdWVEYXRlIikKCiAgICAgICAgdmFsIGlzc3VlZERhdGUgPSBkYXRlUGFydChpc3N1ZWQpCiAgICAgICAgdmFsIGR1ZURhdGUgPSBkYXRlUGFydChkdWUpCiAgICAgICAgdmFsIGNsZWFuQmFyY29kZSA9IGJhcmNvZGUubG93ZXJjYXNlKCkucmVwbGFjZShSZWdleCgiW15hLXowLTldIiksICIiKQogICAgICAgIHZhbCBjbGVhblRpdGxlID0gdGl0bGUubG93ZXJjYXNlKCkucmVwbGFjZShSZWdleCgiW15hLXowLTldIiksICIiKQogICAgICAgIHZhbCBjbGVhbkF1dGhvciA9IGF1dGhvci5sb3dlcmNhc2UoKS5yZXBsYWNlKFJlZ2V4KCJbXmEtejAtOV0iKSwgIiIpCgogICAgICAgIGlmIChjbGVhbkJhcmNvZGUuaXNOb3RCbGFuaygpICYmIGlzc3VlZERhdGUuaXNOb3RCbGFuaygpICYmIGR1ZURhdGUuaXNOb3RCbGFuaygpKSB7CiAgICAgICAgICAgIHJlc3VsdC5hZGQoImxvYW46JGNsZWFuQmFyY29kZXwkaXNzdWVkRGF0ZXwkZHVlRGF0ZSIpCiAgICAgICAgfQogICAgICAgIGlmIChjbGVhbkJhcmNvZGUuaXNOb3RCbGFuaygpICYmIGlzc3VlZERhdGUuaXNOb3RCbGFuaygpKSB7CiAgICAgICAgICAgIHJlc3VsdC5hZGQoImxvYW4taXNzdWVkOiRjbGVhbkJhcmNvZGV8JGlzc3VlZERhdGUiKQogICAgICAgIH0KICAgICAgICBpZiAoY2xlYW5CYXJjb2RlLmlzTm90QmxhbmsoKSAmJiBkdWVEYXRlLmlzTm90QmxhbmsoKSkgewogICAgICAgICAgICByZXN1bHQuYWRkKCJsb2FuLWR1ZTokY2xlYW5CYXJjb2RlfCRkdWVEYXRlIikKICAgICAgICB9CiAgICAgICAgaWYgKGNsZWFuVGl0bGUuaXNOb3RCbGFuaygpICYmIGlzc3VlZERhdGUuaXNOb3RCbGFuaygpICYmIGR1ZURhdGUuaXNOb3RCbGFuaygpKSB7CiAgICAgICAgICAgIHJlc3VsdC5hZGQoInRpdGxlLWxvYW46JGNsZWFuVGl0bGV8JGNsZWFuQXV0aG9yfCRpc3N1ZWREYXRlfCRkdWVEYXRlIikKICAgICAgICB9CgogICAgICAgIHJldHVybiByZXN1bHQKICAgIH0KCg==
+        run: python3 -c "import os,base64; from pathlib import Path; p=Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt'); s=p.read_text(); a=s.index('    private fun isCurrentIssue(item: JSONObject): Boolean {'); b=s.index('    private fun isReturnedIssue(item: JSONObject): Boolean {',a); r=base64.b64decode(os.environ['REPLACEMENT_B64']).decode(); p.write_text(s[:a]+r+s[b:])"
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
-          if git diff --cached --quiet; then
-            echo "No changes needed"
-            exit 0
-          fi
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m "Use exact loan fingerprints for previous issue filtering"
           git push
