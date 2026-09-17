@@ -1,0 +1,124 @@
+name: Fix current loan history filtering
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-history-filter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch history identity matching
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("app/src/main/java/in/miaolibrary/app/MainActivity.kt")
+          s = path.read_text()
+
+          start = s.index("    private fun isCurrentIssue(item: JSONObject): Boolean {")
+          end = s.index("    private fun isReturnedIssue(item: JSONObject): Boolean {", start)
+
+          replacement = r'''    private fun isCurrentIssue(item: JSONObject): Boolean {
+          if (currentIssueKeys.isEmpty()) return false
+
+          // 1. Prefer the exact circulation/loan identifier when Koha supplies one.
+          val issueId = first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId")
+          if (issueId.isNotBlank() && currentIssueKeys.contains("issue:$issueId")) return true
+
+          // 2. Match the actual loan fingerprint.  The same physical copy can be
+          // returned and reissued, so barcode/itemnumber alone must NEVER hide history.
+          return issueFingerprints(item).any { currentIssueKeys.contains(it) }
+      }
+
+      private fun issueKeys(item: JSONObject): Set<String> {
+          val keys = mutableSetOf<String>()
+
+          fun add(prefix: String, value: String) {
+              val v = value.trim()
+              if (v.isNotBlank() && v != "null") keys.add("$prefix:$v")
+          }
+
+          val issueId = first(item, "issue_id", "issueid", "issueId", "checkout_id", "checkoutId", "loan_id", "loanId")
+          if (issueId.isNotBlank()) add("issue", issueId)
+
+          keys.addAll(issueFingerprints(item))
+          return keys
+      }
+
+      private fun issueFingerprints(item: JSONObject): Set<String> {
+          val result = mutableSetOf<String>()
+
+          fun value(vararg names: String): String = first(item, *names).trim()
+
+          fun datePart(raw: String): String {
+              val v = raw.trim().lowercase()
+              val iso = Regex("\\d{4}[-/]\\d{2}[-/]\\d{2}").find(v)?.value
+              if (iso != null) return iso.replace('/', '-')
+              val dmy = Regex("\\d{2}[-/]\\d{2}[-/]\\d{4}").find(v)?.value
+              if (dmy != null) {
+                  val p = dmy.split('-', '/')
+                  return "${p[2]}-${p[1]}-${p[0]}"
+              }
+              return v.replace(Regex("[^a-z0-9]"), "")
+          }
+
+          val barcode = value("barcode", "item_barcode", "itemBarcode")
+          val title = value("title", "name", "book_title", "bookTitle")
+          val author = value("author", "authors", "creator")
+          val issued = value("checkout_date", "date_issued", "issued_date", "issue_date", "date_checkout", "checkoutDate", "issuedDate")
+          val due = value("date_due", "due_date", "duedate", "due", "dueDate")
+
+          val issuedDate = datePart(issued)
+          val dueDate = datePart(due)
+          val cleanBarcode = barcode.lowercase().replace(Regex("[^a-z0-9]"), "")
+          val cleanTitle = title.lowercase().replace(Regex("[^a-z0-9]"), "")
+          val cleanAuthor = author.lowercase().replace(Regex("[^a-z0-9]"), "")
+
+          // Strongest fallback: physical copy + both loan dates.
+          if (cleanBarcode.isNotBlank() && issuedDate.isNotBlank() && dueDate.isNotBlank()) {
+              result.add("loan:$cleanBarcode|$issuedDate|$dueDate")
+          }
+
+          // Also support gateways that expose only one of the two dates.
+          if (cleanBarcode.isNotBlank() && issuedDate.isNotBlank()) {
+              result.add("loan-issued:$cleanBarcode|$issuedDate")
+          }
+          if (cleanBarcode.isNotBlank() && dueDate.isNotBlank()) {
+              result.add("loan-due:$cleanBarcode|$dueDate")
+          }
+
+          // If barcode is absent, title/author + dates still distinguish a reissue
+          // without incorrectly using item_id alone as an identity.
+          if (cleanTitle.isNotBlank() && issuedDate.isNotBlank() && dueDate.isNotBlank()) {
+              result.add("title-loan:$cleanTitle|$cleanAuthor|$issuedDate|$dueDate")
+          }
+
+          return result
+      }
+
+'''
+
+          s = s[:start] + replacement + s[end:]
+          path.write_text(s)
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git commit -m "Use exact loan fingerprints for previous issue filtering"
+          git push
