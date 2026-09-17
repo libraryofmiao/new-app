@@ -15,9 +15,6 @@
             android:name=".AboutActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
-            android:exported="false" />
-        <activity
             android:name=".ModernDashboardActivity"
             android:exported="true">
             <intent-filter>
