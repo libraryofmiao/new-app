@@ -1,0 +1,37 @@
+name: Apply Home UI improvements
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-home-ui.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Home screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt')
+          s=p.read_text()
+          s=s.replace('body.addView(text(section, 26f).apply { setTypeface(typeface, 1) })', 'body.addView(text(section, 26f).apply { setTypeface(typeface, 1); gravity = Gravity.CENTER; setGravity(Gravity.CENTER); setPadding(0, 0, 0, dp(8)) })')
+          old='body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Explore your library", 21f).apply { setTypeface(typeface, 1) }); addView(text("Find books, follow your loans and stay connected with Miao Library.", 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(16)) })'
+          new='body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Arunachal Pradesh\\'s first futuristic New Age Learning Centre — a paradise for book lovers, competitive aspirants, and lifelong learners nestled in the heart of Miao, Changlang district.", 17f, muted).apply { setPadding(0, 0, 0, 0); textAlignment = View.TEXT_ALIGNMENT_TEXT_START; justificationMode = android.text.Layout.JUSTIFICATION_MODE_INTER_WORD }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(16)) })'
+          if old not in s: raise SystemExit('Explore block not found')
+          s=s.replace(old,new)
+          old='val quick = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; val c = button("Catalogue", false); val b = button("My Books", false);'
+          new='val quick = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; val c = button("Catalogue", false).apply { textSize = 15f; setTextColor(Color.WHITE); background = shape(Color.rgb(76, 132, 139), 16) }; val b = button("My Books", false).apply { textSize = 15f; setTextColor(Color.WHITE); background = shape(Color.rgb(91, 126, 157), 16) };'
+          if old not in s: raise SystemExit('Quick block not found')
+          s=s.replace(old,new)
+          s=s.replace('body.addView(text("Library updates", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) })', 'body.addView(text("Library updates", 19f).apply { setTypeface(typeface, 1); gravity = Gravity.CENTER; setGravity(Gravity.CENTER); setPadding(0, dp(24), 0, dp(10)) })')
+          p.write_text(s)
+          PY
+      - name: Commit patched source
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          git commit -m 'Polish Home screen layout and styling' || exit 0
+          git push
