@@ -193,14 +193,14 @@ class MainActivity : AppCompatActivity() {
                 val item = items.optJSONObject(i) ?: continue
                 val box = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
-                    addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) })
-                    addView(text(first(item, "author", "authors", "creator").ifBlank { "Author not available" }, 14f, muted))
-                    addView(text("Library: " + first(item, "library", "location").ifBlank { "Not specified" }, 13f, muted).apply { setPadding(0, dp(8), 0, 0) })
-                    addView(text("Call number: " + first(item, "call_number", "callnumber", "shelfmark").ifBlank { "Not available" }, 13f, muted))
-                    addView(text("Availability: " + first(item, "availability", "status", "available").ifBlank { "Not available" }, 13f, muted))
-                    addView(text("ISBN: " + first(item, "isbn", "isbn13", "isbn10").ifBlank { "Not available" }, 13f, muted))
-                    addView(text("Publisher: " + first(item, "publisher", "publication").ifBlank { "Not available" }, 13f, muted))
-                    addView(text("Holdings: " + first(item, "holding_count", "copy_count", "holdings").ifBlank { "Not available" }, 13f, muted))
+                    addView(text(first(item, "title").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) })
+                    addIfPresent(this, "Author", item, "author")
+                    addIfPresent(this, "Library", item, "library")
+                    addIfPresent(this, "Availability", item, "availability")
+                    addIfPresent(this, "Call number", item, "call_number")
+                    addIfPresent(this, "Barcode", item, "barcode")
+                    addIfPresent(this, "Holdings", item, "holding_count")
+                    addIfPresent(this, "Biblionumber", item, "biblionumber")
                     addView(text("Tap for complete book details", 12f, ink).apply { setPadding(0, dp(12), 0, 0) })
                 }
                 val itemCard = card(box); itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
@@ -208,8 +208,13 @@ class MainActivity : AppCompatActivity() {
         }}
     }
 
+    private fun addIfPresent(parent: LinearLayout, label: String, item: JSONObject, key: String) {
+        val value = first(item, key)
+        if (value.isNotBlank()) parent.addView(text("$label: $value", 13f, muted))
+    }
+
     private fun openDetails(item: JSONObject) {
-        val id = first(item, "biblionumber", "biblio_id", "id")
+        val id = first(item, "biblionumber")
         if (id.isBlank()) { details(item); return }
         request("/book-details/$id", "GET", null, token()) { ok, response -> runOnUiThread {
             if (ok) try { val j = JSONObject(response); details(j.optJSONObject("book") ?: j.optJSONObject("record") ?: j) } catch (_: Exception) { details(item) } else details(item)
