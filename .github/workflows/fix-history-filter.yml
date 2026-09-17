@@ -1,0 +1,38 @@
+name: Apply history filter
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch history filtering
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt')
+          s = p.read_text()
+          old = '''    private fun records(\n    items: JSONArray,\n    output: LinearLayout,\n    current: Boolean\n) {\n    for (i in 0 until items.length()) {\n        val item = items.optJSONObject(i) ?: continue\n'''
+          new = '''    private fun records(\n    items: JSONArray,\n    output: LinearLayout,\n    current: Boolean\n) {\n    for (i in 0 until items.length()) {\n        val item = items.optJSONObject(i) ?: continue\n        if (!current && !isReturnedIssue(item)) continue\n'''
+          if old not in s:
+              raise SystemExit('records block not found')
+          s = s.replace(old, new, 1)
+          marker = '    private fun account(body: LinearLayout) {'
+          helper = '''    private fun isReturnedIssue(item: JSONObject): Boolean {\n        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")\n        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true\n        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()\n        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true\n        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false\n        return false\n    }\n\n'''
+          if marker not in s:
+              raise SystemExit('account marker not found')
+          s = s.replace(marker, helper + marker, 1)
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          git diff --cached --quiet || git commit -m 'Exclude active loans from previous issues'
+          git push
