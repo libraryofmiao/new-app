@@ -70,32 +70,37 @@ class MainActivity : AppCompatActivity() {
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(20), dp(16), dp(20), dp(10)) }
         header.addView(ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_INSIDE }, LinearLayout.LayoutParams(dp(58), dp(58)))
         val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0) }
-        heading.addView(text("Miao Library", 23f).apply { setTypeface(typeface, 1) }); heading.addView(text("Welcome back, ${username()}", 13f, muted)); header.addView(heading, LinearLayout.LayoutParams(0, -2, 1f)); root.addView(header)
-        content = FrameLayout(this); root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(10), dp(8), dp(10), dp(8)); background = shape(Color.WHITE, 24); elevation = dp(8).toFloat() }
-        listOf("⌂\nHome", "⌕\nCatalogue", "▣\nMy Books", "●\nAccount").forEach { item ->
-            val name = item.substringAfter('\n')
-            val tab = TextView(this).apply { text = item; textSize = 12f; gravity = Gravity.CENTER; setTextColor(if (name == section) Color.WHITE else ink); background = if (name == section) shape(ink, 16) else null; setPadding(0, dp(4), 0, dp(4)); setOnClickListener { dashboard(name) } }
-            nav.addView(tab, LinearLayout.LayoutParams(0, dp(58), 1f))
-        }
-        root.addView(nav, LinearLayout.LayoutParams(-1, dp(76))); ViewCompatInsets.apply(root, nav); setContentView(root); showSection(section)
-    }
+        heading.addView(text("Miao Library", 23f).apply { setTypeface(typeface, 1) })
+        heading.addView(text("Welcome back, ${username()}", 13f, muted))
+        header.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(header)
+        content = FrameLayout(this)
+        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
 
-    private object ViewCompatInsets {
-        fun apply(root: View, nav: View) {
-            root.setOnApplyWindowInsetsListener { _, insets ->
-                val bottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
-                root.setPadding(root.paddingLeft, root.paddingTop, root.paddingRight, bottom)
-                val density = nav.resources.displayMetrics.density
-                nav.setPadding((10 * density).toInt(), (8 * density).toInt(), (10 * density).toInt(), (8 * density).toInt())
-                insets
+        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(10), dp(8), dp(10), dp(8)); background = shape(Color.WHITE, 24); elevation = dp(8).toFloat() }
+        val navItems = listOf("⌂" to "Home", "⌕" to "Catalogue", "▣" to "My Books", "●" to "Account")
+        navItems.forEach { pair ->
+            val icon = text(pair.first, 25f, if (pair.second == section) Color.WHITE else ink).apply { gravity = Gravity.CENTER; includeFontPadding = true }
+            val label = text(pair.second, 13f, if (pair.second == section) Color.WHITE else ink).apply { gravity = Gravity.CENTER }
+            val tab = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                background = if (pair.second == section) shape(ink, 18) else null
+                setPadding(dp(4), dp(5), dp(4), dp(5))
+                addView(icon, LinearLayout.LayoutParams(-1, dp(31)))
+                addView(label, LinearLayout.LayoutParams(-1, dp(23)))
+                setOnClickListener { dashboard(pair.second) }
             }
-            root.requestApplyInsets()
+            nav.addView(tab, LinearLayout.LayoutParams(0, dp(68), 1f))
         }
+        root.addView(nav, LinearLayout.LayoutParams(-1, dp(76)))
+        setContentView(root)
+        showSection(section)
     }
 
     private fun showSection(section: String) {
-        content.removeAllViews(); val scroll = ScrollView(this); val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(30)) }
+        content.removeAllViews()
+        val scroll = ScrollView(this)
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(30)) }
         body.addView(text(section, 26f).apply { setTypeface(typeface, 1) })
         when (section) { "Home" -> home(body); "Catalogue" -> catalogue(body); "My Books" -> books(body); "Account" -> account(body) }
         scroll.addView(body); content.addView(scroll)
@@ -123,18 +128,7 @@ class MainActivity : AppCompatActivity() {
             val items = arrayFrom(response, "items", "results", "records", "books")
             if (items.length() == 0) output.addView(card(text("No catalogue records found.", 14f, muted))) else for (i in 0 until items.length()) {
                 val item = items.optJSONObject(i) ?: continue
-                val box = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(text(first(item, "title").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) })
-                    addIfPresent(this, "Author", item, "author")
-                    addIfPresent(this, "Library", item, "library")
-                    addIfPresent(this, "Availability", item, "availability")
-                    addIfPresent(this, "Call number", item, "call_number")
-                    addIfPresent(this, "Barcode", item, "barcode")
-                    addIfPresent(this, "Holdings", item, "holding_count")
-                    addIfPresent(this, "Biblionumber", item, "biblionumber")
-                    addView(text("Tap for complete book details", 12f, ink).apply { setPadding(0, dp(12), 0, 0) })
-                }
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addIfPresent(this, "Author", item, "author"); addIfPresent(this, "Library", item, "library"); addIfPresent(this, "Availability", item, "availability"); addIfPresent(this, "Call number", item, "call_number"); addIfPresent(this, "Barcode", item, "barcode"); addIfPresent(this, "Holdings", item, "holding_count"); addView(text("Tap for complete book details", 12f, ink).apply { setPadding(0, dp(12), 0, 0) }) }
                 val itemCard = card(box); itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) })
             }
         }}
@@ -149,30 +143,76 @@ class MainActivity : AppCompatActivity() {
 
     private fun details(item: JSONObject) {
         dashboard("Catalogue"); content.removeAllViews(); val scroll = ScrollView(this); val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(10), dp(20), dp(30)) }; body.addView(text("Book details", 25f).apply { setTypeface(typeface, 1) })
-        arrayOf("title", "subtitle", "author", "authors", "publisher", "publication", "publication_year", "year", "isbn", "isbn13", "isbn10", "call_number", "callnumber", "shelfmark", "library", "location", "availability", "status", "barcode", "holding_count", "copy_count", "holdings", "item_type", "notes", "biblionumber").forEach { field -> val value = first(item, field); if (value.isNotBlank()) { val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(field.replace('_', ' ').replaceFirstChar { it.uppercase() }, 12f, muted)); addView(text(value, 16f).apply { setPadding(0, dp(4), 0, 0) }) }; body.addView(card(row), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(9)) }) } }; scroll.addView(body); content.addView(scroll)
+        arrayOf("title", "subtitle", "author", "authors", "publisher", "publication", "publication_year", "year", "isbn", "isbn13", "isbn10", "call_number", "callnumber", "shelfmark", "library", "location", "availability", "status", "barcode", "holding_count", "copy_count", "holdings", "item_type", "notes", "biblionumber").forEach { field -> val value = displayValue(item, field); if (value.isNotBlank()) { val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(field.replace('_', ' ').replaceFirstChar { it.uppercase() }, 12f, muted)); addView(text(value, 16f).apply { setPadding(0, dp(4), 0, 0) }) }; body.addView(card(row), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(9)) }) } }; scroll.addView(body); content.addView(scroll)
     }
 
     private fun books(body: LinearLayout) {
         body.addView(text("Currently issued", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(14), 0, dp(10)) }); val currentOutput = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(currentOutput)
         request("/my-books", "GET", null, token()) { ok, response -> runOnUiThread { if (!ok) currentOutput.addView(card(text("Unable to load your books.", 14f, muted))) else { val items = arrayFrom(response, "books", "items", "issues", "current", "current_books"); if (items.length() == 0) currentOutput.addView(card(text("You have no currently issued books.", 14f, muted))) else records(items, currentOutput, true) } } }
         body.addView(text("Previous issues", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) }); val historyOutput = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(historyOutput); historyOutput.addView(card(text("Loading previous issues…", 14f, muted)))
-        request("/issue-history", "GET", null, token()) { ok, response -> runOnUiThread { historyOutput.removeAllViews(); if (!ok) historyOutput.addView(card(text("Unable to load issue history.", 14f, muted))) else { val items = arrayFrom(response, "items", "history", "issues", "books", "previous_issues", "previousIssues", "returned_books", "past_issues"); if (items.length() == 0) historyOutput.addView(card(text("No previous issues found.", 14f, muted))) else records(items, historyOutput, false) } } }
+        request("/issue-history", "GET", null, token()) { ok, response -> runOnUiThread { historyOutput.removeAllViews(); if (!ok) historyOutput.addView(card(text("Unable to load issue history.", 14f, muted))) else { val items = arrayFrom(response, "items", "history", "issues", "books", "previous_issues", "previousIssues", "returned_books", "past_issues", "data", "results"); if (items.length() == 0) historyOutput.addView(card(text("No previous issued books found.", 14f, muted))) else records(items, historyOutput, false) } } }
     }
 
     private fun records(items: JSONArray, output: LinearLayout, current: Boolean) {
-        for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val date = if (current) first(item, "date_due", "due_date", "date_due_formatted") else first(item, "checkout_date", "issued_date", "date_issued", "date_checkout", "date_checked_out"); val returned = first(item, "returned_date", "checkin_date", "date_returned", "return_date", "date_checked_in"); val secondary = first(item, "library", "location", "barcode", "call_number"); val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "author", "authors").ifBlank { "Author not available" }, 14f, muted)); addView(text((if (current) "Due: " else "Issued: ") + date.ifBlank { "Not available" }, 14f)); if (!current && returned.isNotBlank()) addView(text("Returned: $returned", 14f)); if (secondary.isNotBlank()) addView(text(secondary, 13f, muted).apply { setPadding(0, dp(6), 0, 0) }) }; output.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) }
+        for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Untitled" }, 17f).apply { setTypeface(typeface, 1) }); addIfPresent(this, "Author", item, "author"); addIfPresent(this, "Library", item, "library"); addIfPresent(this, if (current) "Due date" else "Returned", item, if (current) "date_due" else "date_returned"); addIfPresent(this, "Checkout date", item, "checkout_date"); addIfPresent(this, "Barcode", item, "barcode") }; output.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) }
     }
 
     private fun account(body: LinearLayout) {
-        body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Library account", 20f).apply { setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(14)) }); val my = button("View My Books", false); body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }; val logout = button("Sign out"); body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
+        body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Library account", 20f).apply { setTypeface(typeface, 1) }); addView(text(username(), 15f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(14)) })
+        val myBooks = button("View my books", false); body.addView(myBooks, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); myBooks.setOnClickListener { dashboard("My Books") }
+        val logout = button("Log out"); body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
     }
 
-    private fun request(path: String, method: String, body: JSONObject?, bearer: String?, done: (Boolean, String) -> Unit) {
-        thread { try { val connection = URL(gateway + path).openConnection() as HttpURLConnection; connection.requestMethod = method; connection.connectTimeout = 15000; connection.readTimeout = 20000; connection.setRequestProperty("Accept", "application/json"); if (!bearer.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $bearer"); if (body != null) { connection.doOutput = true; connection.setRequestProperty("Content-Type", "application/json"); connection.outputStream.use { it.write(body.toString().toByteArray()) } }; val code = connection.responseCode; val stream = if (code in 200..299) connection.inputStream else connection.errorStream; done(code in 200..299, stream?.bufferedReader()?.readText() ?: "HTTP $code") } catch (error: Exception) { done(false, error.message ?: "Network error") } }
+    private fun displayValue(item: JSONObject, key: String): String {
+        val value = item.opt(key) ?: return ""
+        if (value is JSONArray) return prettyArray(value)
+        if (value is JSONObject) return value.toString()
+        return value.toString().trim()
     }
 
-    private fun first(obj: JSONObject, vararg keys: String): String { for (key in keys) if (obj.has(key) && !obj.isNull(key)) { val value = obj.opt(key); if (value is JSONArray || value is JSONObject) return value.toString(); if (value.toString().isNotBlank()) return value.toString() }; return "" }
-    private fun arrayFrom(raw: String, vararg keys: String): JSONArray { return try { findArray(JSONObject(raw), keys.toSet()) ?: JSONArray() } catch (_: Exception) { JSONArray() } }
-    private fun findArray(value: Any?, wanted: Set<String>): JSONArray? { if (value is JSONObject) { for (key in wanted) value.optJSONArray(key)?.let { return it }; val names = value.keys(); while (names.hasNext()) { val found = findArray(value.opt(names.next()), wanted); if (found != null) return found } } else if (value is JSONArray) { for (i in 0 until value.length()) { val found = findArray(value.opt(i), wanted); if (found != null) return found } }; return null }
-    private fun toast(message: String) = runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
+    private fun prettyArray(array: JSONArray): String {
+        val lines = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            val obj = array.optJSONObject(i)
+            if (obj != null) {
+                val parts = mutableListOf<String>()
+                val keys = listOf("item_type", "current_library", "home_library", "collection", "shelving_location", "call_number", "copy_number", "status", "notes", "date_due", "barcode")
+                for (key in keys) { val value = obj.optString(key).trim(); if (value.isNotBlank()) parts.add("${key.replace('_', ' ')}: $value") }
+                lines.add(if (parts.isEmpty()) obj.toString() else parts.joinToString("\n"))
+            } else lines.add(array.optString(i))
+        }
+        return lines.joinToString("\n\n")
+    }
+
+    private fun first(item: JSONObject, vararg keys: String): String { for (key in keys) { val value = displayValue(item, key); if (value.isNotBlank() && value != "null") return value }; return "" }
+
+    private fun arrayFrom(response: String, vararg keys: String): JSONArray {
+        return try {
+            val root = JSONObject(response)
+            for (key in keys) { val direct = root.opt(key); if (direct is JSONArray) return direct; if (direct is JSONObject) { val nested = findArray(direct, keys.toSet()); if (nested.length() > 0) return nested } }
+            findArray(root, keys.toSet())
+        } catch (_: Exception) { JSONArray() }
+    }
+
+    private fun findArray(obj: JSONObject, wanted: Set<String>): JSONArray {
+        val preferred = listOf("items", "books", "issues", "history", "previous_issues", "previousIssues", "returned_books", "past_issues", "results", "records", "data", "content", "announcements")
+        for (key in preferred) { val value = obj.opt(key); if (value is JSONArray && (wanted.contains(key) || key == "data" || key == "items")) return value }
+        val names = obj.keys()
+        while (names.hasNext()) { val key = names.next(); val value = obj.opt(key); if (value is JSONArray && value.length() > 0 && (wanted.contains(key) || key.lowercase().contains("histor") || key.lowercase().contains("issue") || key.lowercase().contains("book"))) return value }
+        return JSONArray()
+    }
+
+    private fun request(path: String, method: String, body: JSONObject?, bearer: String?, callback: (Boolean, String) -> Unit) {
+        thread {
+            try {
+                val connection = URL(gateway + path).openConnection() as HttpURLConnection
+                connection.requestMethod = method; connection.connectTimeout = 15000; connection.readTimeout = 20000; connection.setRequestProperty("Accept", "application/json")
+                if (!bearer.isNullOrBlank()) connection.setRequestProperty("Authorization", "Bearer $bearer")
+                if (body != null) { connection.doOutput = true; connection.setRequestProperty("Content-Type", "application/json"); connection.outputStream.use { it.write(body.toString().toByteArray()) } }
+                val code = connection.responseCode; val stream = if (code in 200..299) connection.inputStream else connection.errorStream; val response = stream?.bufferedReader()?.use { it.readText() } ?: ""; callback(code in 200..299, response); connection.disconnect()
+            } catch (e: Exception) { callback(false, e.message ?: "Network error") }
+        }
+    }
+
+    private fun toast(message: String) { runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() } }
 }
