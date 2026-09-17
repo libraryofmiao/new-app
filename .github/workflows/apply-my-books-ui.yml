@@ -1,0 +1,74 @@
+name: Apply My Books UI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch My Books screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('app/src/main/java/in/miaolibrary/app/MainActivity.kt')
+          s = p.read_text()
+
+          start = s.index('    private fun books(body: LinearLayout) {')
+          end = s.index('\n    private fun loadHistory', start)
+          replacement = '''    private fun books(body: LinearLayout) {
+        body.addView(text("Currently Issued", 20f).apply {
+            gravity = Gravity.CENTER
+            setTypeface(typeface, 1)
+            setPadding(0, dp(14), 0, dp(12))
+        })
+        val current = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        body.addView(current)
+        request("/my-books", "GET", null, token()) { ok, response -> runOnUiThread {
+            if (!ok) {
+                current.addView(card(text("Unable to load your books.", 14f, muted)))
+            } else {
+                val items = arrayFrom(response, "books", "items", "issues", "current", "current_books")
+                if (items.length() == 0) {
+                    current.addView(card(text("You have no currently issued books.", 14f, muted).apply { gravity = Gravity.CENTER }))
+                } else records(items, current, true)
+            }
+        }}
+
+        body.addView(text("Previous Issues", 20f).apply {
+            gravity = Gravity.CENTER
+            setTypeface(typeface, 1)
+            setPadding(0, dp(26), 0, dp(10))
+        })
+        val historyButton = button("Load Issue History / Previous Issues", true).apply {
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            background = shape(Color.rgb(54, 102, 94), 16)
+            setPadding(dp(12), 0, dp(12), 0)
+        }
+        body.addView(historyButton, LinearLayout.LayoutParams(-1, dp(52)).apply {
+            setMargins(0, 0, 0, dp(12))
+        })
+        val history = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        body.addView(history)
+        history.addView(card(text("Press the button to load your previous issued books.", 14f, muted).apply { gravity = Gravity.CENTER }))
+        historyButton.setOnClickListener { loadHistory(history) }
+    }
+'''
+          s = s[:start] + replacement + s[end:]
+
+          # Center the page heading for every dashboard section.
+          s = s.replace('body.addView(text(section, 26f).apply { setTypeface(typeface, 1) })', 'body.addView(text(section, 26f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setPadding(0, dp(8), 0, dp(6)) })')
+          p.write_text(s)
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/in/miaolibrary/app/MainActivity.kt
+          git diff --cached --quiet || git commit -m "Improve My Books screen and style history button"
+          git push
