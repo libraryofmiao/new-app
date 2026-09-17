@@ -86,25 +86,38 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSection(section: String) {
         content.removeAllViews(); val scroll = ScrollView(this); val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(36)) }
-        body.addView(text(section, 26f).apply { setTypeface(typeface, 1) })
+        body.addView(text(section, 26f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setPadding(0, dp(8), 0, dp(8)) })
         when (section) { "Home" -> home(body); "Catalogue" -> catalogue(body); "My Books" -> books(body); "Account" -> account(body) }
         scroll.addView(body); content.addView(scroll)
     }
 
     private fun home(body: LinearLayout) {
-        body.addView(text("A welcoming space for learning, discovery and connection", 16f, muted).apply { setPadding(0, dp(8), 0, dp(16)) })
-        body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Explore your library", 21f).apply { setTypeface(typeface, 1) }); addView(text("Find books, follow your loans and stay connected with Miao Library.", 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(16)) })
-        val quick = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }; val c = button("Catalogue", false); val b = button("My Books", false); quick.addView(c, LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(0, 0, dp(6), 0) }); quick.addView(b, LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(dp(6), 0, 0, 0) }); c.setOnClickListener { dashboard("Catalogue") }; b.setOnClickListener { dashboard("My Books") }; body.addView(quick)
-        body.addView(text("Library updates", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) }); val loading = card(text("Loading announcements…", 14f, muted)); body.addView(loading)
-        request("/cms/content", "GET", null, token()) { ok, response -> runOnUiThread { body.removeView(loading); if (!ok) body.addView(card(text("Announcements are temporarily unavailable.", 14f, muted))) else { val items = arrayFrom(response, "items", "content", "announcements"); if (items.length() == 0) body.addView(card(text("No current announcements.", 14f, muted))) else for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Announcement" }, 17f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "body", "description", "html", "content"), 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }; body.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } } } }
-    }
+    body.addView(text("A welcoming space for learning, discovery and connection", 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, dp(16)) })
+    val exploreText = text("Arunachal Pradesh's first futuristic New Age Learning Centre — a paradise for book lovers, competitive aspirants, and lifelong learners nestled in the heart of Miao, Changlang district.", 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }
+    exploreText.textAlignment = View.TEXT_ALIGNMENT_CENTER
+    body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(exploreText) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(16)) })
+    val quick = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+    val c = button("Catalogue", true).apply { textSize = 15f }
+    val b = button("My Books", true).apply { textSize = 15f }
+    quick.addView(c, LinearLayout.LayoutParams(0, dp(56), 1f).apply { setMargins(0, 0, dp(6), 0) })
+    quick.addView(b, LinearLayout.LayoutParams(0, dp(56), 1f).apply { setMargins(dp(6), 0, 0, 0) })
+    c.setOnClickListener { dashboard("Catalogue") }; b.setOnClickListener { dashboard("My Books") }; body.addView(quick)
+    body.addView(text("Library updates", 20f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) })
+    val loading = card(text("Loading announcements…", 14f, muted)); body.addView(loading)
+    request("/cms/content", "GET", null, token()) { ok, response -> runOnUiThread { body.removeView(loading); if (!ok) body.addView(card(text("Announcements are temporarily unavailable.", 14f, muted))) else { val items = arrayFrom(response, "items", "content", "announcements"); if (items.length() == 0) body.addView(card(text("No current announcements.", 14f, muted))) else for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title", "name").ifBlank { "Published announcement" }, 17f).apply { setTypeface(typeface, 1) }); addView(text(first(item, "body", "description", "html", "content"), 14f, muted).apply { setPadding(0, dp(8), 0, 0) }) }; body.addView(card(box), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } } } }
+    val footer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(0, dp(30), 0, dp(12)) }
+    val website = text("Our Official Website : miaolibrary.in", 14f, ink).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1); setOnClickListener { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://miaolibrary.in"))) } }
+    footer.addView(website)
+    footer.addView(text("© Sub Divisional Library, Miao. All Rights Reserved.", 12f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) })
+    body.addView(footer)
+}
 
     private fun catalogue(body: LinearLayout) {
         val input = EditText(this).apply { hint = "Search books, authors or subjects"; setSingleLine(); background = shape(); setPadding(dp(16), 0, dp(16), 0) }; body.addView(input, LinearLayout.LayoutParams(-1, dp(56)).apply { setMargins(0, dp(14), 0, dp(10)) }); val search = button("Search catalogue"); body.addView(search, LinearLayout.LayoutParams(-1, dp(52))); val output = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(output, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(18), 0, 0) }); search.setOnClickListener { searchCatalogue(input.text.toString(), output, search) }; searchCatalogue("", output, search)
     }
 
     private fun searchCatalogue(query: String, output: LinearLayout, search: Button) {
-        search.isEnabled = false; output.removeAllViews(); output.addView(text("Searching catalogue…", 14f, muted)); request("/catalogue/search?q=" + URLEncoder.encode(query, "UTF-8"), "GET", null, token()) { ok, response -> runOnUiThread { search.isEnabled = true; output.removeAllViews(); if (!ok) { output.addView(card(text("Catalogue unavailable.", 14f, muted))); return@runOnUiThread }; val items = arrayFrom(response, "items", "results", "records", "books"); if (items.length() == 0) output.addView(card(text("No catalogue records found.", 14f, muted))) else for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addIfPresent(this, "Author", item, "author"); addIfPresent(this, "Library", item, "library"); addIfPresent(this, "Availability", item, "availability"); addIfPresent(this, "Call number", item, "call_number"); addIfPresent(this, "Barcode", item, "barcode"); addIfPresent(this, "Holdings", item, "holding_count"); addView(text("Tap for complete book details", 12f, ink).apply { setPadding(0, dp(12), 0, 0) }) }; val itemCard = card(box); itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } } }
+        search.isEnabled = false; output.removeAllViews(); output.addView(text("Searching catalogue…", 14f, muted)); request("/catalogue/search?q=" + URLEncoder.encode(query, "UTF-8"), "GET", null, token()) { ok, response -> runOnUiThread { search.isEnabled = true; output.removeAllViews(); if (!ok) { output.addView(card(text("Catalogue unavailable.", 14f, muted))); return@runOnUiThread }; val items = arrayFrom(response, "items", "results", "records", "books"); if (items.length() == 0) output.addView(card(text("No catalogue records found.", 14f, muted))) else for (i in 0 until items.length()) { val item = items.optJSONObject(i) ?: continue; val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text(first(item, "title").ifBlank { "Untitled" }, 18f).apply { setTypeface(typeface, 1) }); addIfPresent(this, "Author", item, "author"); addIfPresent(this, "Library", item, "library"); addIfPresent(this, "Availability", item, "availability"); addIfPresent(this, "Call number", item, "call_number"); addIfPresent(this, "Barcode", item, "barcode"); addIfPresent(this, "Holdings", item, "holding_count"); addView(text("Tap for complete book details", 12f, ink).apply { setPadding(0, dp(12), 0, 0) }) }; val itemCard = card(box).apply { background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(20).toFloat(); setStroke(dp(1), ink) }; elevation = dp(2).toFloat() }; itemCard.setOnClickListener { openDetails(item) }; output.addView(itemCard, LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 0, 0, dp(12)) }) } } }
     }
 
     private fun addIfPresent(parent: LinearLayout, label: String, item: JSONObject, key: String) { val value = first(item, key); if (value.isNotBlank()) parent.addView(text("$label: $value", 13f, muted)) }
@@ -114,7 +127,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun books(body: LinearLayout) {
         body.addView(text("Currently issued", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(14), 0, dp(10)) }); val current = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(current); request("/my-books", "GET", null, token()) { ok, response -> runOnUiThread { if (!ok) current.addView(card(text("Unable to load your books.", 14f, muted))) else { val items = arrayFrom(response, "books", "items", "issues", "current", "current_books"); if (items.length() == 0) current.addView(card(text("You have no currently issued books.", 14f, muted))) else records(items, current, true) } } }
-        body.addView(text("Previous issues", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) }); val history = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(history); val historyButton = button("Load Issue History / Previous Issues", false); body.addView(historyButton, 1, LinearLayout.LayoutParams(-1, dp(50)).apply { setMargins(0, 0, 0, dp(12)) }); history.addView(card(text("Press the button to load your previous issued books.", 14f, muted))); historyButton.setOnClickListener { loadHistory(history) }
+        body.addView(text("Previous issues", 19f).apply { setTypeface(typeface, 1); setPadding(0, dp(24), 0, dp(10)) }); val history = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; body.addView(history); val historyButton = button("Load Issue History / Previous Issues", true).apply { setTextColor(Color.WHITE); background = shape(Color.rgb(72, 105, 112), 16); textSize = 14f }; body.addView(historyButton, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(12)) }); history.addView(card(text("Press the button to load your previous issued books.", 14f, muted))); historyButton.setOnClickListener { loadHistory(history) }
     }
 
     private fun loadHistory(output: LinearLayout) {
@@ -227,50 +240,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 }
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
-        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
-        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
-        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
-        return false
-    }
-
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
-        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
-        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
-        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
-        return false
-    }
-
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
-        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
-        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
-        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
-        return false
-    }
-
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
-        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
-        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
-        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
-        return false
-    }
-
-    private fun isReturnedIssue(item: JSONObject): Boolean {
-        val returnedKeys = listOf("date_returned", "returned_date", "return_date", "checkin_date", "date_checkin")
-        if (returnedKeys.any { item.optString(it, "").trim().isNotBlank() && item.optString(it, "").trim() != "null" }) return true
-        val status = first(item, "status", "issue_status", "item_status", "loan_status").lowercase()
-        if (status.contains("return") || status.contains("checkin") || status.contains("closed")) return true
-        if (status.contains("issue") || status.contains("checkout") || status.contains("loan") || status.contains("out")) return false
-        return false
-    }
 
     private fun account(body: LinearLayout) { body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(text("Library account", 20f).apply { setTypeface(typeface, 1) }); addView(text(username(), 15f, muted).apply { setPadding(0, dp(8), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(14)) }); val my = button("View my books", false); body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }; val logout = button("Log out"); body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() } }
 
