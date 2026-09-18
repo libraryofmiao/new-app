@@ -85,6 +85,10 @@ class MainActivity : AppCompatActivity() {
 
         if (token().isNullOrBlank()) {
             login()
+        } else if (memberInfo() == null || !memberPhotoFile().exists()) {
+            fetchAndStoreMemberData {
+                runOnUiThread { dashboard("Home") }
+            }
         } else {
             dashboard("Home")
         }
