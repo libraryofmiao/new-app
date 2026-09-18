@@ -65,7 +65,6 @@ class MainActivity : AppCompatActivity() {
         val info = memberInfo() ?: return false
         return memberField(info, "name").isNotBlank() &&
                 memberField(info, "card_number").isNotBlank() &&
-                memberField(info, "email") != "" &&
                 memberField(info, "membership_expiry_date").isNotBlank() &&
                 memberField(info, "membership_status").isNotBlank()
     }
