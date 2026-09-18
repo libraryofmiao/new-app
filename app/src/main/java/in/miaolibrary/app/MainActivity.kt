@@ -3,6 +3,7 @@ package `in`.miaolibrary.app
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.PictureDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -19,6 +20,7 @@ import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.concurrent.thread
+import com.caverock.androidsvg.SVG
 
 class MainActivity : AppCompatActivity() {
     private val gateway = "https://api.miaolibrary.in"
@@ -272,6 +274,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(root)
     }
 
+    private fun libraryNavIcon(assetName: String): ImageView = ImageView(this).apply {
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        try {
+            val svg = SVG.getFromAsset(assets, "advanced_library_icons/$assetName.svg")
+            setImageDrawable(PictureDrawable(svg.renderToPicture()))
+        } catch (_: Exception) {
+            setImageResource(R.drawable.logo)
+        }
+    }
+
     private fun dashboard(section: String) {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -338,20 +350,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         listOf(
-            "⌂" to "Home",
-            "⌕" to "Catalogue",
-            "▣" to "My Books",
-            "●" to "Account"
+            "home" to "Home",
+            "catalog" to "Catalogue",
+            "my-books" to "My Books",
+            "account" to "Account"
         ).forEach { pair ->
             val selected = pair.second == section
 
-            val icon = text(
-                pair.first,
-                30f,
-                if (selected) Color.WHITE else ink
-            ).apply {
-                gravity = Gravity.CENTER
-                includeFontPadding = true
+            val icon = libraryNavIcon(pair.first).apply {
+                alpha = if (selected) 1f else 0.78f
             }
 
             val label = text(
@@ -366,7 +373,7 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 background =
-                    if (selected) shape(ink, 18) else null
+                    if (selected) shape(Color.rgb(232, 228, 220), 18) else null
                 setPadding(dp(3), dp(4), dp(3), dp(4))
 
                 addView(
