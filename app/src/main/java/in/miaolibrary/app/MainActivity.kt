@@ -1,6 +1,8 @@
 package `in`.miaolibrary.app
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.PictureDrawable
@@ -278,7 +280,54 @@ class MainActivity : AppCompatActivity() {
         scaleType = ImageView.ScaleType.CENTER_INSIDE
         try {
             val svg = SVG.getFromAsset(assets, "advanced_library_icons/$assetName.svg")
-            setImageDrawable(PictureDrawable(svg.renderToPicture()))
+            val picture = svg.renderToPicture()
+
+            // Render and crop transparent SVG margins so the actual artwork,
+            // rather than the padded SVG viewBox, fills the icon area.
+            val sourceW = picture.width.coerceAtLeast(1)
+            val sourceH = picture.height.coerceAtLeast(1)
+            val renderSize = 512
+            val scale = minOf(
+                renderSize.toFloat() / sourceW,
+                renderSize.toFloat() / sourceH
+            )
+            val renderedW = (sourceW * scale).toInt().coerceAtLeast(1)
+            val renderedH = (sourceH * scale).toInt().coerceAtLeast(1)
+            val bitmap = Bitmap.createBitmap(renderedW, renderedH, Bitmap.Config.ARGB_8888)
+            Canvas(bitmap).apply {
+                scale(scale, scale)
+                drawPicture(picture)
+            }
+
+            var left = renderedW
+            var top = renderedH
+            var right = -1
+            var bottom = -1
+
+            for (y in 0 until renderedH) {
+                for (x in 0 until renderedW) {
+                    if (bitmap.getPixel(x, y) ushr 24 > 8) {
+                        if (x < left) left = x
+                        if (y < top) top = y
+                        if (x > right) right = x
+                        if (y > bottom) bottom = y
+                    }
+                }
+            }
+
+            if (right >= left && bottom >= top) {
+                val cropped = Bitmap.createBitmap(
+                    bitmap,
+                    left,
+                    top,
+                    right - left + 1,
+                    bottom - top + 1
+                )
+                if (cropped !== bitmap) bitmap.recycle()
+                setImageBitmap(cropped)
+            } else {
+                setImageBitmap(bitmap)
+            }
         } catch (_: Exception) {
             setImageResource(R.drawable.logo)
         }
