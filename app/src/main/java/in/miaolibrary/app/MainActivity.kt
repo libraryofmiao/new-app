@@ -1,5 +1,6 @@
 package `in`.miaolibrary.app
 
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -12,6 +13,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.io.File
+import java.io.FileOutputStream
 import java.net.URLEncoder
 import kotlin.concurrent.thread
 
@@ -28,6 +31,12 @@ class MainActivity : AppCompatActivity() {
     private fun prefs() = getSharedPreferences("session", MODE_PRIVATE)
     private fun token() = prefs().getString("access_token", null)
     private fun username() = prefs().getString("username", "Patron") ?: "Patron"
+    private fun memberInfo(): JSONObject? {
+        val raw = prefs().getString("member_info", null) ?: return null
+        return try { JSONObject(raw) } catch (_: Exception) { null }
+    }
+
+    private fun memberPhotoFile() = File(filesDir, "member_photo.jpg")
 
     private fun text(
         value: String,
@@ -199,7 +208,11 @@ class MainActivity : AppCompatActivity() {
                             )
                             .apply()
 
-                        dashboard("Home")
+                        fetchAndStoreMemberData {
+                            runOnUiThread {
+                                dashboard("Home")
+                            }
+                        }
                     } catch (_: Exception) {
                         toast("Invalid gateway response.")
                     }
@@ -368,50 +381,69 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun home(body: LinearLayout) {
+        val info = memberInfo()
         val idCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             background = shape(Color.WHITE, 24)
-            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setPadding(dp(14), dp(14), dp(14), dp(14))
             elevation = dp(4).toFloat()
         }
 
         val photo = ImageView(this).apply {
-            setImageResource(R.drawable.hs)
+            val file = memberPhotoFile()
+            if (file.exists()) {
+                BitmapFactory.decodeFile(file.absolutePath)?.let { setImageBitmap(it) }
+            }
             scaleType = ImageView.ScaleType.CENTER_CROP
             clipToOutline = true
+            background = shape(Color.rgb(238, 235, 229), 18)
         }
 
-        idCard.addView(
-            photo,
-            LinearLayout.LayoutParams(-1, dp(300))
-        )
+        idCard.addView(photo, LinearLayout.LayoutParams(dp(108), dp(140)))
 
-        idCard.addView(
-            text(username(), 21f).apply {
-                gravity = Gravity.CENTER
-                setTypeface(typeface, 1)
-                setPadding(0, dp(14), 0, 0)
-            }
-        )
-
-        idCard.addView(
-            text("Library Patron", 14f, muted).apply {
-                gravity = Gravity.CENTER
-                setPadding(0, dp(4), 0, 0)
-            }
-        )
-
-        idCard.setOnClickListener {
-            dashboard("Account")
+        val details = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), 0, 0, 0)
         }
 
-        body.addView(
-            idCard,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, dp(22), 0, dp(24))
-            }
+        val fields = listOf(
+            "name" to "Name",
+            "cardnumber" to "Card No.",
+            "card_number" to "Card No.",
+            "category" to "Category",
+            "email" to "Email",
+            "phone" to "Phone",
+            "address" to "Address",
+            "dateexpiry" to "Expiry"
         )
+
+        var shown = 0
+        val used = mutableSetOf<String>()
+        for ((key, label) in fields) {
+            if (used.contains(label)) continue
+            val value = info?.optString(key, "")?.trim().orEmpty()
+            if (value.isNotBlank() && value != "null") {
+                details.addView(text("$label: $value", if (shown == 0) 18f else 13f, if (shown == 0) ink else muted).apply {
+                    setTypeface(typeface, if (shown == 0) 1 else 0)
+                    setPadding(0, if (shown == 0) 0 else dp(7), 0, 0)
+                })
+                used.add(label)
+                shown++
+            }
+        }
+
+        if (shown == 0) {
+            details.addView(text(username(), 18f).apply { setTypeface(typeface, 1) })
+            details.addView(text("Library Patron", 13f, muted).apply { setPadding(0, dp(6), 0, 0) })
+        }
+
+        idCard.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
+        idCard.setOnClickListener { dashboard("Account") }
+
+        body.addView(idCard, LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(0, dp(22), 0, dp(24))
+        })
     }
 
     private fun catalogue(body: LinearLayout) {
@@ -1071,7 +1103,12 @@ class MainActivity : AppCompatActivity() {
     body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; addView(text("Library account", 21f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) }); addView(text("Your Koha patron account", 13f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(16)) })
     val my = button("View my books", false).apply { textSize = 15f }; body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
     val refresh = button("Refresh account", false).apply { textSize = 15f }; body.addView(refresh, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); refresh.setOnClickListener { dashboard("Account") }
-    val logout = button("Log out", true).apply { background = shape(Color.rgb(155, 76, 76), 16); textSize = 15f }; body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener { prefs().edit().clear().apply(); login() }
+    val logout = button("Log out", true).apply { background = shape(Color.rgb(155, 76, 76), 16); textSize = 15f }; body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener {
+        prefs().edit().clear().apply()
+        memberPhotoFile().delete()
+        File(filesDir, "member_photo.tmp").delete()
+        login()
+    }
 
     val footer = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -1278,6 +1315,58 @@ class MainActivity : AppCompatActivity() {
         }
 
         return JSONArray()
+    }
+
+    private fun fetchAndStoreMemberData(done: () -> Unit) {
+        val access = token()
+        if (access.isNullOrBlank()) {
+            done()
+            return
+        }
+
+        thread {
+            request("/account", "GET", null, access) { ok, response ->
+                if (ok) {
+                    prefs().edit().putString("member_info", response).apply()
+                }
+
+                fetchAndStoreMemberPhoto(access) {
+                    done()
+                }
+            }
+        }
+    }
+
+    private fun fetchAndStoreMemberPhoto(access: String, done: () -> Unit) {
+        thread {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = (URL(gateway + "/account/photo").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    setRequestProperty("Authorization", "Bearer $access")
+                    setRequestProperty("Accept", "image/jpeg,image/png")
+                }
+
+                if (connection.responseCode in 200..299) {
+                    val temp = File(filesDir, "member_photo.tmp")
+                    connection.inputStream.use { input ->
+                        FileOutputStream(temp).use { output -> input.copyTo(output) }
+                    }
+                    val target = memberPhotoFile()
+                    if (temp.length() > 0L) {
+                        temp.copyTo(target, overwrite = true)
+                    }
+                    temp.delete()
+                }
+            } catch (_: Exception) {
+                // Keep the existing stored photo if the refresh fails.
+            } finally {
+                connection?.disconnect()
+                runOnUiThread { done() }
+            }
+        }
     }
 
     private fun request(
