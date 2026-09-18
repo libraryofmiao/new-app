@@ -305,7 +305,14 @@ class MainActivity : AppCompatActivity() {
         )
 
         heading.addView(
-            text("Welcome back, ${username()}", 14f, muted)
+            val firstName = memberField(memberInfo() ?: JSONObject(), "name")
+                .trim()
+                .split(Regex("\\s+"))
+                .firstOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?: username()
+
+            text("Welcome back, $firstName", 14f, muted)
         )
 
         header.addView(
