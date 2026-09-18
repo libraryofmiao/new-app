@@ -462,14 +462,6 @@ class MainActivity : AppCompatActivity() {
             "patron_cardnumber", "patron_card_number"
         )
 
-        val memberType = memberField(
-            info,
-            "membership_status",
-            "category", "categoryname", "category_name",
-            "category_description", "categorycode", "category_code",
-            "patron_category", "patron_category_name", "borrower_category"
-        )
-
         val email = memberField(info, "email", "emailaddress", "email_address")
         val expiry = memberField(
             info,
@@ -510,17 +502,8 @@ class MainActivity : AppCompatActivity() {
         addDetail("Membership Expiry", expiry)
         addDetail("Membership Status", membershipStatus)
 
-        // Preserve the earlier working card fallback instead of ever leaving
-        // the text side completely blank.
-        if (shown == 0) {
-            addDetail("Name", username(), true)
-            addDetail("Member Type", "Library Patron")
-        } else if (cardNumber.isBlank()) {
-            // If the gateway response is the older shape, still show the
-            // familiar member type information when available.
-            addDetail("Member Type", "Library Patron")
-        }
-
+        // The gateway now provides the complete member contract.
+        // Render only the five approved profile fields above.
         idCard.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         idCard.setOnClickListener { dashboard("Account") }
 
