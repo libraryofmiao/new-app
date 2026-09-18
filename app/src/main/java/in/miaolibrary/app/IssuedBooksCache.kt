@@ -177,8 +177,9 @@ object IssuedBooksCache {
 
 class IssuedBooksDailyRefreshReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action != null && intent.action != Intent.ACTION_BOOT_COMPLETED) {
-            // The receiver is also used by the daily AlarmManager intent.
+        if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
+            IssuedBooksCache.scheduleDaily(context)
+            return
         }
 
         val pending = goAsync()
