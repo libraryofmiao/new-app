@@ -444,22 +444,64 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(14), 0, 0, 0)
         }
 
-        // These are the exact patron fields returned by the gateway /account contract.
-        // Do not substitute Koha HTML-only fields such as category, phone, borrowernumber or username.
-        val fullName = memberField(info, "name")
-        val cardNumber = memberField(info, "card_number")
-        val email = memberField(info, "email")
-        val expiry = memberField(info, "membership_expiry_date")
-        val membershipStatus = memberField(info, "membership_status")
+        // Keep the field aliases used by the earlier working member card.
+        // Also support the new gateway contract fields.
+        val fullName = memberField(
+            info,
+            "name", "fullname", "full_name", "displayname", "display_name"
+        ).ifBlank {
+            listOf(
+                memberField(info, "firstname", "first_name", "givenname", "given_name"),
+                memberField(info, "surname", "lastname", "last_name", "familyname", "family_name")
+            ).filter { it.isNotBlank() }.joinToString(" ")
+        }
+
+        val cardNumber = memberField(
+            info,
+            "card_number", "cardnumber", "cardNumber",
+            "patron_cardnumber", "patron_card_number"
+        )
+
+        val memberType = memberField(
+            info,
+            "membership_status",
+            "category", "categoryname", "category_name",
+            "category_description", "categorycode", "category_code",
+            "patron_category", "patron_category_name", "borrower_category"
+        )
+
+        val email = memberField(info, "email", "emailaddress", "email_address")
+        val expiry = memberField(
+            info,
+            "membership_expiry_date", "dateexpiry", "date_expiry",
+            "expiry", "expiry_date"
+        )
+
+        val membershipStatus = memberField(
+            info,
+            "membership_status", "status", "member_status"
+        )
+
+        var shown = 0
 
         fun addDetail(label: String, value: String, prominent: Boolean = false) {
             if (value.isBlank() || value == "null") return
             details.addView(
-                text("$label: $value", if (prominent) 18f else 13f, if (prominent) ink else muted).apply {
+                text(
+                    "$label: $value",
+                    if (prominent) 18f else 13f,
+                    if (prominent) ink else muted
+                ).apply {
                     setTypeface(typeface, if (prominent) 1 else 0)
-                    setPadding(0, if (details.childCount == 0) 0 else dp(7), 0, 0)
+                    setPadding(
+                        0,
+                        if (details.childCount == 0) 0 else dp(7),
+                        0,
+                        0
+                    )
                 }
             )
+            shown++
         }
 
         addDetail("Name", fullName, true)
@@ -468,13 +510,28 @@ class MainActivity : AppCompatActivity() {
         addDetail("Membership Expiry", expiry)
         addDetail("Membership Status", membershipStatus)
 
+        // Preserve the earlier working card fallback instead of ever leaving
+        // the text side completely blank.
+        if (shown == 0) {
+            addDetail("Name", username(), true)
+            addDetail("Member Type", "Library Patron")
+        } else if (cardNumber.isBlank()) {
+            // If the gateway response is the older shape, still show the
+            // familiar member type information when available.
+            addDetail("Member Type", "Library Patron")
+        }
+
         idCard.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         idCard.setOnClickListener { dashboard("Account") }
 
-        body.addView(idCard, LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(0, dp(22), 0, dp(24))
-        })
+        body.addView(
+            idCard,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                setMargins(0, dp(22), 0, dp(24))
+            }
+        )
     }
+
     private fun catalogue(body: LinearLayout) {
         val input = EditText(this).apply {
             hint = "Search books, authors or subjects"
