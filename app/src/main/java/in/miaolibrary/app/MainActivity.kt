@@ -16,6 +16,8 @@ import java.net.URL
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URLEncoder
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -388,7 +390,9 @@ class MainActivity : AppCompatActivity() {
     private fun showSection(section: String) {
         content.removeAllViews()
 
-        val scroll = ScrollView(this)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+        }
 
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -444,39 +448,14 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(14), 0, 0, 0)
         }
 
-        // Keep the field aliases used by the earlier working member card.
-        // Also support the new gateway contract fields.
-        val fullName = memberField(
-            info,
-            "name", "fullname", "full_name", "displayname", "display_name"
-        ).ifBlank {
-            listOf(
-                memberField(info, "firstname", "first_name", "givenname", "given_name"),
-                memberField(info, "surname", "lastname", "last_name", "familyname", "family_name")
-            ).filter { it.isNotBlank() }.joinToString(" ")
-        }
+        val fullName = memberField(info, "name")
+        val cardNumber = memberField(info, "card_number")
+        val email = memberField(info, "email")
+        val expiry = memberField(info, "membership_expiry_date")
+        val membershipStatus = memberField(info, "membership_status")
 
-        val cardNumber = memberField(
-            info,
-            "card_number", "cardnumber", "cardNumber",
-            "patron_cardnumber", "patron_card_number"
-        )
-
-        val email = memberField(info, "email", "emailaddress", "email_address")
-        val expiry = memberField(
-            info,
-            "membership_expiry_date", "dateexpiry", "date_expiry",
-            "expiry", "expiry_date"
-        )
-
-        val membershipStatus = memberField(
-            info,
-            "membership_status", "status", "member_status"
-        )
-
-        fun addDetail(label: String?, value: String, prominent: Boolean = false) {
-            if (value.isBlank() || value == "null") return
-            val display = if (label.isNullOrBlank()) value else "$label: $value"
+        fun addDetail(display: String, prominent: Boolean = false) {
+            if (display.isBlank() || display == "null") return
             details.addView(
                 text(
                     display,
@@ -484,22 +463,16 @@ class MainActivity : AppCompatActivity() {
                     if (prominent) ink else muted
                 ).apply {
                     setTypeface(typeface, if (prominent) 1 else 0)
-                    setPadding(
-                        0,
-                        if (details.childCount == 0) 0 else dp(7),
-                        0,
-                        0
-                    )
+                    setPadding(0, if (details.childCount == 0) 0 else dp(7), 0, 0)
                 }
             )
         }
 
-        // Home member ID card wording.
-        addDetail(null, fullName, true)
-        addDetail("Card No.", cardNumber)
-        addDetail("Email", email)
-        addDetail("Valid Upto", expiry)
-        addDetail("Membership Status", membershipStatus)
+        addDetail(fullName, true)
+        addDetail("Card No.: $cardNumber")
+        addDetail("Email: $email")
+        addDetail("Valid Upto : ${formatMembershipExpiry(expiry)}")
+        addDetail("Membership Status: $membershipStatus")
 
         idCard.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         idCard.setOnClickListener { dashboard("Account") }
@@ -511,75 +484,56 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
-        // Published announcements appear only at the bottom of Home.
-        // No CMS content means no label or placeholder is shown.
-        val announcementArea = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-        }
-
-        body.addView(
-            announcementArea,
-            LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, dp(8), 0, dp(18))
-            }
-        )
+        // Invisible flexible space keeps published announcements at the bottom
+        // of the Home viewport. With no published content, no announcement
+        // container or label is created at all.
+        body.addView(Space(this), LinearLayout.LayoutParams(1, 0, 1f))
 
         request("/cms/content", "GET", null, token()) { ok, response ->
             if (!ok) return@request
 
             runOnUiThread {
-                val items = arrayFrom(
-                    response,
-                    "items",
-                    "content",
-                    "announcements"
-                )
+                val rawItems = arrayFrom(response, "items", "content", "announcements")
+                val publishedItems = mutableListOf<JSONObject>()
+                for (i in 0 until rawItems.length()) {
+                    val item = rawItems.optJSONObject(i) ?: continue
+                    if (isPublishedAnnouncement(item)) publishedItems.add(item)
+                }
 
-                if (items.length() == 0) return@runOnUiThread
+                if (publishedItems.isEmpty()) return@runOnUiThread
+
+                val announcementArea = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    setPadding(0, dp(8), 0, dp(18))
+                }
 
                 announcementArea.addView(
                     text("Announcements", 19f).apply {
                         gravity = Gravity.CENTER
                         setTypeface(typeface, 1)
                         setPadding(0, 0, 0, dp(10))
-                    },
-                    LinearLayout.LayoutParams(-1, -2)
+                    }
                 )
 
-                for (i in 0 until items.length()) {
-                    val item = items.optJSONObject(i) ?: continue
-                    val title = first(item, "title", "name")
-                        .ifBlank { "Published announcement" }
-                    val bodyText = first(
-                        item,
-                        "body",
-                        "description",
-                        "html",
-                        "content"
-                    )
+                for (item in publishedItems) {
+                    val title = first(item, "title", "name").ifBlank { "Published announcement" }
+                    val bodyText = first(item, "body", "description", "html", "content")
 
                     val box = LinearLayout(this).apply {
                         orientation = LinearLayout.VERTICAL
                         gravity = Gravity.CENTER_HORIZONTAL
                     }
-
-                    box.addView(
-                        text(title, 17f).apply {
-                            gravity = Gravity.CENTER
-                            setTypeface(typeface, 1)
-                        }
-                    )
-
+                    box.addView(text(title, 17f).apply {
+                        gravity = Gravity.CENTER
+                        setTypeface(typeface, 1)
+                    })
                     if (bodyText.isNotBlank()) {
-                        box.addView(
-                            text(bodyText, 14f, muted).apply {
-                                gravity = Gravity.CENTER
-                                setPadding(0, dp(8), 0, 0)
-                            }
-                        )
+                        box.addView(text(bodyText, 14f, muted).apply {
+                            gravity = Gravity.CENTER
+                            setPadding(0, dp(8), 0, 0)
+                        })
                     }
-
                     announcementArea.addView(
                         card(box),
                         LinearLayout.LayoutParams(-1, -2).apply {
@@ -587,10 +541,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     )
                 }
+
+                body.addView(announcementArea, LinearLayout.LayoutParams(-1, -2))
             }
         }
     }
-
     private fun catalogue(body: LinearLayout) {
         val input = EditText(this).apply {
             hint = "Search books, authors or subjects"
@@ -1250,27 +1205,18 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_HORIZONTAL
-
-                    addView(
-                        text("Library account", 21f).apply {
-                            gravity = Gravity.CENTER
-                            setTypeface(typeface, 1)
-                        }
-                    )
-
-                    addView(
-                        text(username(), 16f, muted).apply {
-                            gravity = Gravity.CENTER
-                            setPadding(0, dp(8), 0, 0)
-                        }
-                    )
-
-                    addView(
-                        text("Your Koha patron account", 13f, muted).apply {
-                            gravity = Gravity.CENTER
-                            setPadding(0, dp(4), 0, 0)
-                        }
-                    )
+                    addView(text("Library account", 21f).apply {
+                        gravity = Gravity.CENTER
+                        setTypeface(typeface, 1)
+                    })
+                    addView(text(username(), 16f, muted).apply {
+                        gravity = Gravity.CENTER
+                        setPadding(0, dp(8), 0, 0)
+                    })
+                    addView(text("Your Koha patron account", 13f, muted).apply {
+                        gravity = Gravity.CENTER
+                        setPadding(0, dp(4), 0, 0)
+                    })
                 }
             ),
             LinearLayout.LayoutParams(-1, -2).apply {
@@ -1278,25 +1224,17 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
-        val refresh = button("Refresh account", false).apply {
-            textSize = 15f
-        }
-        body.addView(
-            refresh,
-            LinearLayout.LayoutParams(-1, dp(52)).apply {
-                setMargins(0, 0, 0, dp(10))
-            }
-        )
+        val refresh = button("Refresh account", false).apply { textSize = 15f }
+        body.addView(refresh, LinearLayout.LayoutParams(-1, dp(52)).apply {
+            setMargins(0, 0, 0, dp(10))
+        })
         refresh.setOnClickListener { dashboard("Account") }
 
         val logout = button("Log out", true).apply {
             background = shape(Color.rgb(155, 76, 76), 16)
             textSize = 15f
         }
-        body.addView(
-            logout,
-            LinearLayout.LayoutParams(-1, dp(52))
-        )
+        body.addView(logout, LinearLayout.LayoutParams(-1, dp(52)))
         logout.setOnClickListener {
             prefs().edit().clear().apply()
             memberPhotoFile().delete()
@@ -1304,26 +1242,60 @@ class MainActivity : AppCompatActivity() {
             login()
         }
 
+        // Flexible space pins the complete footer to the bottom of Account.
+        body.addView(Space(this), LinearLayout.LayoutParams(1, 0, 1f))
+
         val footer = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        setPadding(0, dp(34), 0, dp(12))
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(34), 0, dp(12))
+        }
+
+        footer.addView(text("Our Official Website : miaolibrary.in", 14f, ink).apply {
+            gravity = Gravity.CENTER
+            setTypeface(typeface, 1)
+            setOnClickListener {
+                startActivity(android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://miaolibrary.in")
+                ))
+            }
+        })
+        footer.addView(text("Developed By : A. M. Tripathi", 13f, muted).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, 0)
+        })
+        footer.addView(text("© Sub Divisional Library Miao. All Rights Reserved.", 12f, muted).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, 0)
+        })
+        body.addView(footer, LinearLayout.LayoutParams(-1, -2))
     }
-    val website = text("Our Official Website : miaolibrary.in", 14f, ink).apply {
-        gravity = Gravity.CENTER
-        setTypeface(typeface, 1)
-        setOnClickListener {
-            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://miaolibrary.in")))
+    private fun formatMembershipExpiry(value: String): String {
+        val raw = value.trim()
+        if (raw.isBlank() || raw == "null") return ""
+        return try {
+            val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
+            val date = parser.parse(raw) ?: return raw
+            SimpleDateFormat("dd MMMM yyyy", Locale.US).format(date)
+        } catch (_: Exception) {
+            raw
         }
     }
-    footer.addView(website)
-    footer.addView(text("© Sub Divisional Library Miao. All Rights Reserved.", 12f, muted).apply {
-        gravity = Gravity.CENTER
-        setPadding(0, dp(8), 0, 0)
-    })
-    body.addView(footer)
-}
 
+    private fun isPublishedAnnouncement(item: JSONObject): Boolean {
+        val published = item.opt("published")
+        if (published is Boolean && !published) return false
+        if (published is String && published.trim().lowercase() in setOf("false", "0", "no", "draft", "unpublished")) return false
+
+        val isPublished = item.opt("is_published")
+        if (isPublished is Boolean && !isPublished) return false
+        if (isPublished is String && isPublished.trim().lowercase() in setOf("false", "0", "no")) return false
+
+        val status = first(item, "status", "publish_status", "publication_status").lowercase()
+        if (status in setOf("draft", "unpublished", "inactive", "archived", "deleted")) return false
+        return true
+    }
     private fun displayValue(
         item: JSONObject,
         key: String
