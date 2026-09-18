@@ -987,7 +987,7 @@ class MainActivity : AppCompatActivity() {
         fun refreshFromGateway() {
             refreshButton.isEnabled = false
             refreshButton.text = "Refreshing…"
-            IssuedBooksCache.fetch(this@MainActivity, false) { ok, items ->
+            IssuedBooksCache.fetch(this@MainActivity, IssuedBooksCache.isAfterFivePmIst()) { ok, items ->
                 runOnUiThread {
                     refreshButton.isEnabled = true
                     refreshButton.text = "Refresh issued books"
@@ -1347,17 +1347,18 @@ class MainActivity : AppCompatActivity() {
     }
     private fun syncIssuedBooksCacheIfNeeded() {
         val cached = IssuedBooksCache.cached(this)
-        val mustFetch = cached == null || IssuedBooksCache.shouldDailyFetch(this)
 
-        if (mustFetch) {
+        // My Books performs the first fetch when no local record exists.
+        // Once a record exists, only the daily 5 PM IST check may fetch here.
+        if (cached != null && IssuedBooksCache.shouldDailyFetch(this)) {
             IssuedBooksCache.fetch(this, true) { ok, items ->
                 if (ok) {
                     DueDateNotificationScheduler.sync(this, items)
-                } else if (cached != null) {
+                } else {
                     DueDateNotificationScheduler.sync(this, cached)
                 }
             }
-        } else {
+        } else if (cached != null) {
             DueDateNotificationScheduler.sync(this, cached)
         }
     }
