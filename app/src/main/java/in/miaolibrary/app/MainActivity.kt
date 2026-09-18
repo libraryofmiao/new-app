@@ -36,15 +36,38 @@ class MainActivity : AppCompatActivity() {
         return try { JSONObject(raw) } catch (_: Exception) { null }
     }
 
+    private fun memberField(info: JSONObject, vararg keys: String): String {
+        fun find(obj: JSONObject, depth: Int): String {
+            if (depth > 3) return ""
+            for (key in keys) {
+                val value = obj.opt(key)
+                if (value != null && value !is JSONObject && value !is JSONArray) {
+                    val text = value.toString().trim()
+                    if (text.isNotBlank() && text != "null") return text
+                }
+            }
+            val names = obj.keys()
+            while (names.hasNext()) {
+                val value = obj.opt(names.next())
+                if (value is JSONObject) {
+                    val found = find(value, depth + 1)
+                    if (found.isNotBlank()) return found
+                }
+            }
+            return ""
+        }
+        return find(info, 0)
+    }
+
     private fun memberPhotoFile() = File(filesDir, "member_photo.jpg")
 
     private fun hasCompleteMemberInfo(): Boolean {
         val info = memberInfo() ?: return false
-        return info.optString("name").isNotBlank() &&
-                info.optString("card_number").isNotBlank() &&
-                info.has("email") &&
-                info.optString("membership_expiry_date").isNotBlank() &&
-                info.optString("membership_status").isNotBlank()
+        return memberField(info, "name").isNotBlank() &&
+                memberField(info, "card_number").isNotBlank() &&
+                memberField(info, "email") != "" &&
+                memberField(info, "membership_expiry_date").isNotBlank() &&
+                memberField(info, "membership_status").isNotBlank()
     }
 
     private fun text(
@@ -424,11 +447,11 @@ class MainActivity : AppCompatActivity() {
 
         // These are the exact patron fields returned by the gateway /account contract.
         // Do not substitute Koha HTML-only fields such as category, phone, borrowernumber or username.
-        val fullName = first(info, "name")
-        val cardNumber = first(info, "card_number")
-        val email = first(info, "email")
-        val expiry = first(info, "membership_expiry_date")
-        val membershipStatus = first(info, "membership_status")
+        val fullName = memberField(info, "name")
+        val cardNumber = memberField(info, "card_number")
+        val email = memberField(info, "email")
+        val expiry = memberField(info, "membership_expiry_date")
+        val membershipStatus = memberField(info, "membership_status")
 
         fun addDetail(label: String, value: String, prominent: Boolean = false) {
             if (value.isBlank() || value == "null") return
