@@ -128,13 +128,15 @@ class MainActivity : AppCompatActivity() {
             fetchAndStoreMemberData {
                 runOnUiThread {
                     dashboard("Home")
-                    syncDueDateNotifications()
+                    syncIssuedBooksCacheIfNeeded()
                 }
             }
         } else {
             dashboard("Home")
-            syncDueDateNotifications()
+            syncIssuedBooksCacheIfNeeded()
         }
+
+        IssuedBooksCache.scheduleDaily(this)
     }
 
     private fun login() {
@@ -258,7 +260,7 @@ class MainActivity : AppCompatActivity() {
                         fetchAndStoreMemberData {
                             runOnUiThread {
                                 dashboard("Home")
-                                syncDueDateNotifications()
+                                syncIssuedBooksCacheIfNeeded()
                             }
                         }
                     } catch (_: Exception) {
@@ -951,59 +953,63 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
+        val refreshButton = button("Refresh issued books", false).apply {
+            textSize = 14f
+        }
+        body.addView(
+            refreshButton,
+            LinearLayout.LayoutParams(-1, dp(48)).apply {
+                setMargins(0, 0, 0, dp(12))
+            }
+        )
+
         val current = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
-
         body.addView(current)
 
-        request(
-            "/my-books",
-            "GET",
-            null,
-            token()
-        ) { ok, response ->
-            runOnUiThread {
-                if (!ok) {
-                    current.addView(
-                        card(
-                            text(
-                                "Unable to load your books.",
-                                14f,
-                                muted
-                            )
-                        )
-                    )
-                } else {
-                    val items = arrayFrom(
-                        response,
-                        "books",
-                        "items",
-                        "issues",
-                        "current",
-                        "current_books"
-                    )
+        fun showBooks(items: JSONArray) {
+            current.removeAllViews()
+            currentIssueKeys.clear()
+            for (i in 0 until items.length()) {
+                items.optJSONObject(i)?.let { currentIssueKeys.addAll(issueKeys(it)) }
+            }
 
-                    currentIssueKeys.clear()
-                    for (i in 0 until items.length()) {
-                        items.optJSONObject(i)?.let { currentIssueKeys.addAll(issueKeys(it)) }
-                    }
+            if (items.length() == 0) {
+                current.addView(
+                    card(text("You have no currently issued books.", 14f, muted))
+                )
+            } else {
+                records(items, current, true)
+            }
+        }
 
-                    if (items.length() == 0) {
-                        current.addView(
-                            card(
-                                text(
-                                    "You have no currently issued books.",
-                                    14f,
-                                    muted
-                                )
-                            )
-                        )
+        fun refreshFromGateway() {
+            refreshButton.isEnabled = false
+            refreshButton.text = "Refreshing…"
+            IssuedBooksCache.fetch(this@MainActivity, false) { ok, items ->
+                runOnUiThread {
+                    refreshButton.isEnabled = true
+                    refreshButton.text = "Refresh issued books"
+                    if (ok) {
+                        showBooks(items)
+                        DueDateNotificationScheduler.sync(this@MainActivity, items)
                     } else {
-                        records(items, current, true)
+                        toast("Unable to refresh issued books.")
+                        showBooks(items)
                     }
                 }
             }
+        }
+
+        refreshButton.setOnClickListener { refreshFromGateway() }
+
+        val cached = IssuedBooksCache.cached(this)
+        if (cached != null) {
+            showBooks(cached)
+        } else {
+            current.addView(card(text("Loading your issued books…", 14f, muted)))
+            refreshFromGateway()
         }
 
         body.addView(
@@ -1339,12 +1345,20 @@ class MainActivity : AppCompatActivity() {
         })
         body.addView(footer, LinearLayout.LayoutParams(-1, -2))
     }
-    private fun syncDueDateNotifications() {
-        val access = token() ?: return
-        request("/my-books", "GET", null, access) { ok, response ->
-            if (!ok) return@request
-            val items = arrayFrom(response, "books", "items", "issues", "current", "current_books")
-            DueDateNotificationScheduler.sync(this, items)
+    private fun syncIssuedBooksCacheIfNeeded() {
+        val cached = IssuedBooksCache.cached(this)
+        val mustFetch = cached == null || IssuedBooksCache.shouldDailyFetch(this)
+
+        if (mustFetch) {
+            IssuedBooksCache.fetch(this, true) { ok, items ->
+                if (ok) {
+                    DueDateNotificationScheduler.sync(this, items)
+                } else if (cached != null) {
+                    DueDateNotificationScheduler.sync(this, cached)
+                }
+            }
+        } else {
+            DueDateNotificationScheduler.sync(this, cached)
         }
     }
 
