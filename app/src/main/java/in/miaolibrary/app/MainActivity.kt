@@ -385,7 +385,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun home(body: LinearLayout) {
-        val info = memberInfo()
+        val info = memberInfo() ?: JSONObject()
         val idCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
