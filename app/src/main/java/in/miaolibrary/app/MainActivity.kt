@@ -1276,6 +1276,15 @@ class MainActivity : AppCompatActivity() {
         })
         body.addView(footer, LinearLayout.LayoutParams(-1, -2))
     }
+    private fun syncDueDateNotifications() {
+        val access = token() ?: return
+        request("/my-books", "GET", null, access) { ok, response ->
+            if (!ok) return@request
+            val items = arrayFrom(response, "books", "items", "issues", "current", "current_books")
+            DueDateNotificationScheduler.sync(this, items)
+        }
+    }
+
     private fun formatMembershipExpiry(value: String): String {
         val raw = value.trim()
         if (raw.isBlank() || raw == "null") return ""
