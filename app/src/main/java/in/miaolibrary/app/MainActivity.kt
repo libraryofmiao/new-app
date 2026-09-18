@@ -1114,6 +1114,92 @@ class MainActivity : AppCompatActivity() {
         login()
     }
 
+    body.addView(
+        text("Announcements", 20f).apply {
+            setTypeface(typeface, 1)
+            setPadding(0, dp(28), 0, dp(10))
+        }
+    )
+
+    val announcements = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+    }
+    body.addView(announcements)
+
+    announcements.addView(
+        card(text("Loading announcements…", 14f, muted)),
+        LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(0, 0, 0, dp(12))
+        }
+    )
+
+    request("/cms/content", "GET", null, token()) { ok, response ->
+        runOnUiThread {
+            announcements.removeAllViews()
+
+            if (!ok) {
+                announcements.addView(
+                    card(text("Announcements are temporarily unavailable.", 14f, muted))
+                )
+                return@runOnUiThread
+            }
+
+            val items = arrayFrom(
+                response,
+                "items",
+                "content",
+                "announcements"
+            )
+
+            if (items.length() == 0) {
+                announcements.addView(
+                    card(text("No current announcements.", 14f, muted))
+                )
+            } else {
+                for (i in 0 until items.length()) {
+                    val item = items.optJSONObject(i) ?: continue
+                    val title = first(
+                        item,
+                        "title",
+                        "name"
+                    ).ifBlank { "Published announcement" }
+                    val bodyText = first(
+                        item,
+                        "body",
+                        "description",
+                        "html",
+                        "content"
+                    )
+
+                    val box = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+
+                        addView(
+                            text(title, 17f).apply {
+                                setTypeface(typeface, 1)
+                            }
+                        )
+
+                        if (bodyText.isNotBlank()) {
+                            addView(
+                                text(bodyText, 14f, muted).apply {
+                                    setPadding(0, dp(8), 0, 0)
+                                }
+                            )
+                        }
+                    }
+
+                    announcements.addView(
+                        card(box),
+                        LinearLayout.LayoutParams(-1, -2).apply {
+                            setMargins(0, 0, 0, dp(12))
+                        }
+                    )
+                }
+            }
+        }
+    }
+
     val footer = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
