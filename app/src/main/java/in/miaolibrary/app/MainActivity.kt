@@ -474,13 +474,12 @@ class MainActivity : AppCompatActivity() {
             "membership_status", "status", "member_status"
         )
 
-        var shown = 0
-
-        fun addDetail(label: String, value: String, prominent: Boolean = false) {
+        fun addDetail(label: String?, value: String, prominent: Boolean = false) {
             if (value.isBlank() || value == "null") return
+            val display = if (label.isNullOrBlank()) value else "$label: $value"
             details.addView(
                 text(
-                    "$label: $value",
+                    display,
                     if (prominent) 18f else 13f,
                     if (prominent) ink else muted
                 ).apply {
@@ -493,26 +492,103 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             )
-            shown++
         }
 
-        addDetail("Name", fullName, true)
+        // Home member ID card wording.
+        addDetail(null, fullName, true)
         addDetail("Card No.", cardNumber)
         addDetail("Email", email)
-        addDetail("Membership Expiry", expiry)
+        addDetail("Valid Upto", expiry)
         addDetail("Membership Status", membershipStatus)
 
-        // The gateway now provides the complete member contract.
-        // Render only the five approved profile fields above.
         idCard.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         idCard.setOnClickListener { dashboard("Account") }
 
         body.addView(
             idCard,
             LinearLayout.LayoutParams(-1, -2).apply {
-                setMargins(0, dp(22), 0, dp(24))
+                setMargins(0, dp(22), 0, dp(18))
             }
         )
+
+        // Published announcements appear only at the bottom of Home.
+        // No CMS content means no label or placeholder is shown.
+        val announcementArea = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        body.addView(
+            announcementArea,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                setMargins(0, dp(8), 0, dp(18))
+            }
+        )
+
+        request("/cms/content", "GET", null, token()) { ok, response ->
+            if (!ok) return@request
+
+            runOnUiThread {
+                val items = arrayFrom(
+                    response,
+                    "items",
+                    "content",
+                    "announcements"
+                )
+
+                if (items.length() == 0) return@runOnUiThread
+
+                announcementArea.addView(
+                    text("Announcements", 19f).apply {
+                        gravity = Gravity.CENTER
+                        setTypeface(typeface, 1)
+                        setPadding(0, 0, 0, dp(10))
+                    },
+                    LinearLayout.LayoutParams(-1, -2)
+                )
+
+                for (i in 0 until items.length()) {
+                    val item = items.optJSONObject(i) ?: continue
+                    val title = first(item, "title", "name")
+                        .ifBlank { "Published announcement" }
+                    val bodyText = first(
+                        item,
+                        "body",
+                        "description",
+                        "html",
+                        "content"
+                    )
+
+                    val box = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    }
+
+                    box.addView(
+                        text(title, 17f).apply {
+                            gravity = Gravity.CENTER
+                            setTypeface(typeface, 1)
+                        }
+                    )
+
+                    if (bodyText.isNotBlank()) {
+                        box.addView(
+                            text(bodyText, 14f, muted).apply {
+                                gravity = Gravity.CENTER
+                                setPadding(0, dp(8), 0, 0)
+                            }
+                        )
+                    }
+
+                    announcementArea.addView(
+                        card(box),
+                        LinearLayout.LayoutParams(-1, -2).apply {
+                            setMargins(0, 0, 0, dp(10))
+                        }
+                    )
+                }
+            }
+        }
     }
 
     private fun catalogue(body: LinearLayout) {
@@ -1169,103 +1245,66 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun account(body: LinearLayout) {
-    body.addView(card(LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; addView(text("Library account", 21f).apply { gravity = Gravity.CENTER; setTypeface(typeface, 1) }); addView(text(username(), 16f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0) }); addView(text("Your Koha patron account", 13f, muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) }) }), LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, dp(14), 0, dp(16)) })
-    val my = button("View my books", false).apply { textSize = 15f }; body.addView(my, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); my.setOnClickListener { dashboard("My Books") }
-    val refresh = button("Refresh account", false).apply { textSize = 15f }; body.addView(refresh, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(0, 0, 0, dp(10)) }); refresh.setOnClickListener { dashboard("Account") }
-    val logout = button("Log out", true).apply { background = shape(Color.rgb(155, 76, 76), 16); textSize = 15f }; body.addView(logout, LinearLayout.LayoutParams(-1, dp(52))); logout.setOnClickListener {
-        prefs().edit().clear().apply()
-        memberPhotoFile().delete()
-        File(filesDir, "member_photo.tmp").delete()
-        login()
-    }
+        body.addView(
+            card(
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_HORIZONTAL
 
-    body.addView(
-        text("Announcements", 20f).apply {
-            setTypeface(typeface, 1)
-            setPadding(0, dp(28), 0, dp(10))
-        }
-    )
-
-    val announcements = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-    }
-    body.addView(announcements)
-
-    announcements.addView(
-        card(text("Loading announcements…", 14f, muted)),
-        LinearLayout.LayoutParams(-1, -2).apply {
-            setMargins(0, 0, 0, dp(12))
-        }
-    )
-
-    request("/cms/content", "GET", null, token()) { ok, response ->
-        runOnUiThread {
-            announcements.removeAllViews()
-
-            if (!ok) {
-                announcements.addView(
-                    card(text("Announcements are temporarily unavailable.", 14f, muted))
-                )
-                return@runOnUiThread
-            }
-
-            val items = arrayFrom(
-                response,
-                "items",
-                "content",
-                "announcements"
-            )
-
-            if (items.length() == 0) {
-                announcements.addView(
-                    card(text("No current announcements.", 14f, muted))
-                )
-            } else {
-                for (i in 0 until items.length()) {
-                    val item = items.optJSONObject(i) ?: continue
-                    val title = first(
-                        item,
-                        "title",
-                        "name"
-                    ).ifBlank { "Published announcement" }
-                    val bodyText = first(
-                        item,
-                        "body",
-                        "description",
-                        "html",
-                        "content"
+                    addView(
+                        text("Library account", 21f).apply {
+                            gravity = Gravity.CENTER
+                            setTypeface(typeface, 1)
+                        }
                     )
 
-                    val box = LinearLayout(this).apply {
-                        orientation = LinearLayout.VERTICAL
-
-                        addView(
-                            text(title, 17f).apply {
-                                setTypeface(typeface, 1)
-                            }
-                        )
-
-                        if (bodyText.isNotBlank()) {
-                            addView(
-                                text(bodyText, 14f, muted).apply {
-                                    setPadding(0, dp(8), 0, 0)
-                                }
-                            )
+                    addView(
+                        text(username(), 16f, muted).apply {
+                            gravity = Gravity.CENTER
+                            setPadding(0, dp(8), 0, 0)
                         }
-                    }
+                    )
 
-                    announcements.addView(
-                        card(box),
-                        LinearLayout.LayoutParams(-1, -2).apply {
-                            setMargins(0, 0, 0, dp(12))
+                    addView(
+                        text("Your Koha patron account", 13f, muted).apply {
+                            gravity = Gravity.CENTER
+                            setPadding(0, dp(4), 0, 0)
                         }
                     )
                 }
+            ),
+            LinearLayout.LayoutParams(-1, -2).apply {
+                setMargins(0, dp(14), 0, dp(16))
             }
-        }
-    }
+        )
 
-    val footer = LinearLayout(this).apply {
+        val refresh = button("Refresh account", false).apply {
+            textSize = 15f
+        }
+        body.addView(
+            refresh,
+            LinearLayout.LayoutParams(-1, dp(52)).apply {
+                setMargins(0, 0, 0, dp(10))
+            }
+        )
+        refresh.setOnClickListener { dashboard("Account") }
+
+        val logout = button("Log out", true).apply {
+            background = shape(Color.rgb(155, 76, 76), 16)
+            textSize = 15f
+        }
+        body.addView(
+            logout,
+            LinearLayout.LayoutParams(-1, dp(52))
+        )
+        logout.setOnClickListener {
+            prefs().edit().clear().apply()
+            memberPhotoFile().delete()
+            File(filesDir, "member_photo.tmp").delete()
+            login()
+        }
+
+        val footer = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
         setPadding(0, dp(34), 0, dp(12))
@@ -1278,7 +1317,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     footer.addView(website)
-    footer.addView(text("© Sub Divisional Library, Miao. All Rights Reserved.", 12f, muted).apply {
+    footer.addView(text("© Sub Divisional Library Miao. All Rights Reserved.", 12f, muted).apply {
         gravity = Gravity.CENTER
         setPadding(0, dp(8), 0, 0)
     })
