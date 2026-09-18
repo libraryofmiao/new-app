@@ -2,9 +2,9 @@ name: Android build
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,13 +12,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Remove item-only history identity
-        run: python3 -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgnYXBwL3NyYy9tYWluL2phdmEvaW4vbWlhb2xpYnJhcnkvYXBwL01haW5BY3Rpdml0eS5rdCcpCnM9cC5yZWFkX3RleHQoKQpzPXMucmVwbGFjZSgnICAgICAgICBhZGQoIml0ZW0iLCBmaXJzdChpdGVtLCAiaXRlbV9pZCIsICJpdGVtaWQiLCAiaXRlbUlkIiwgIml0ZW1udW1iZXIiLCAiaXRlbV9udW1iZXIiKSlcbicsJycpCnAud3JpdGVfdGV4dChzKQo='))"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
