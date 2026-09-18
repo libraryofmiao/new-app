@@ -107,6 +107,7 @@ object DueDateNotificationScheduler {
         val intent = Intent(context, DueDateNotificationReceiver::class.java).apply {
             putExtra("title", title)
             putExtra("due_date", dueDate)
+            putExtra("notification_id", requestCode)
         }
         val pending = PendingIntent.getBroadcast(
             context,
@@ -153,6 +154,7 @@ object DueDateNotificationScheduler {
         val formats = listOf(
             "yyyy-MM-dd",
             "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss",
             "yyyy-MM-dd HH:mm",
             "dd/MM/yyyy",
             "MM/dd/yyyy"
@@ -192,6 +194,7 @@ class DueDateNotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val title = intent.getStringExtra("title") ?: "Your borrowed book"
         val dueDate = intent.getStringExtra("due_date").orEmpty()
+        val notificationId = intent.getIntExtra("notification_id", title.hashCode())
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
@@ -231,7 +234,7 @@ class DueDateNotificationReceiver : BroadcastReceiver() {
             .setContentIntent(openApp)
             .build()
 
-        manager.notify(title.hashCode(), notification)
+        manager.notify(notificationId, notification)
     }
 }
 
