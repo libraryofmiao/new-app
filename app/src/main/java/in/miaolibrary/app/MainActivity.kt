@@ -411,17 +411,13 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(14), 0, 0, 0)
         }
 
-        val fullName = first(info, "name", "fullname", "full_name", "displayname", "display_name").ifBlank {
-            listOf(
-                first(info, "firstname", "first_name", "givenname", "given_name"),
-                first(info, "surname", "lastname", "last_name", "familyname", "family_name")
-            ).filter { it.isNotBlank() }.joinToString(" ")
-        }
-        val cardNumber = first(info, "cardnumber", "card_number", "cardNumber", "patron_cardnumber", "patron_card_number")
-        val memberType = first(info, "category", "categoryname", "category_name", "category_description", "categorycode", "category_code", "patron_category", "patron_category_name", "borrower_category")
-        val email = first(info, "email", "emailaddress", "email_address")
-        val phone = first(info, "phone", "phonepro", "mobile", "mobilephone", "mobile_phone")
-        val expiry = first(info, "dateexpiry", "date_expiry", "expiry", "expiry_date")
+        // These are the exact patron fields returned by the gateway /account contract.
+        // Do not substitute Koha HTML-only fields such as category, phone, borrowernumber or username.
+        val fullName = first(info, "name")
+        val cardNumber = first(info, "card_number")
+        val email = first(info, "email")
+        val expiry = first(info, "membership_expiry_date")
+        val membershipStatus = first(info, "membership_status")
 
         fun addDetail(label: String, value: String, prominent: Boolean = false) {
             if (value.isBlank() || value == "null") return
@@ -433,12 +429,11 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        addDetail("Name", fullName.ifBlank { username() }, true)
+        addDetail("Name", fullName, true)
         addDetail("Card No.", cardNumber)
-        addDetail("Member Type", memberType)
         addDetail("Email", email)
-        addDetail("Phone", phone)
-        addDetail("Expiry", expiry)
+        addDetail("Membership Expiry", expiry)
+        addDetail("Membership Status", membershipStatus)
 
         idCard.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
         idCard.setOnClickListener { dashboard("Account") }
