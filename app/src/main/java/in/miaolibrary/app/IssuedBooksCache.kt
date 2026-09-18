@@ -29,11 +29,18 @@ object IssuedBooksCache {
 
     fun hasCache(context: Context): Boolean = cached(context) != null
 
+    fun isAfterFivePmIst(): Boolean {
+        val now = Calendar.getInstance().apply {
+            timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
+        }
+        return now.get(Calendar.HOUR_OF_DAY) >= 17
+    }
+
     fun shouldDailyFetch(context: Context): Boolean {
         val now = Calendar.getInstance().apply {
             timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
         }
-        if (now.get(Calendar.HOUR_OF_DAY) < 17) return false
+        if (!isAfterFivePmIst()) return false
         val today = dateKey(now)
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(DAILY_FETCH_DATE, "") != today
@@ -76,10 +83,15 @@ object IssuedBooksCache {
 
                 // Replace the local issued-book record only after a successful
                 // gateway fetch. The previous record remains untouched on failure.
-                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(CACHE, response)
-                    .apply()
+                val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val oldResponse = preferences.getString(CACHE, null)
+                if (oldResponse != response) {
+                    // Successful data changed: replace the complete local
+                    // issued-book record with the newly fetched record.
+                    preferences.edit()
+                        .putString(CACHE, response)
+                        .apply()
+                }
 
                 if (markDailyFetch) {
                     val now = Calendar.getInstance().apply {
