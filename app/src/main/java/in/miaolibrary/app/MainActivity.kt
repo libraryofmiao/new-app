@@ -378,12 +378,12 @@ class MainActivity : AppCompatActivity() {
 
                 addView(
                     icon,
-                    LinearLayout.LayoutParams(-1, dp(36))
+                    LinearLayout.LayoutParams(-1, dp(52))
                 )
 
                 addView(
                     label,
-                    LinearLayout.LayoutParams(-1, dp(25))
+                    LinearLayout.LayoutParams(-1, dp(24))
                 )
 
                 setOnClickListener {
@@ -393,13 +393,13 @@ class MainActivity : AppCompatActivity() {
 
             nav.addView(
                 tab,
-                LinearLayout.LayoutParams(0, dp(76), 1f)
+                LinearLayout.LayoutParams(0, dp(84), 1f)
             )
         }
 
         root.addView(
             nav,
-            LinearLayout.LayoutParams(-1, dp(92))
+            LinearLayout.LayoutParams(-1, dp(100))
         )
 
         setContentView(root)
