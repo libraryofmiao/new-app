@@ -427,7 +427,7 @@ class MainActivity : AppCompatActivity() {
 
                 addView(
                     icon,
-                    LinearLayout.LayoutParams(-1, dp(40))
+                    LinearLayout.LayoutParams(-1, dp(30))
                 )
 
                 addView(
