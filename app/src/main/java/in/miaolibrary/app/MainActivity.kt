@@ -122,10 +122,14 @@ class MainActivity : AppCompatActivity() {
             // Refresh stale/old cached profile data once. After that, keep it
             // locally until the next logout/login.
             fetchAndStoreMemberData {
-                runOnUiThread { dashboard("Home") }
+                runOnUiThread {
+                    dashboard("Home")
+                    syncDueDateNotifications()
+                }
             }
         } else {
             dashboard("Home")
+            syncDueDateNotifications()
         }
     }
 
@@ -250,6 +254,7 @@ class MainActivity : AppCompatActivity() {
                         fetchAndStoreMemberData {
                             runOnUiThread {
                                 dashboard("Home")
+                                syncDueDateNotifications()
                             }
                         }
                     } catch (_: Exception) {
