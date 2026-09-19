@@ -1348,9 +1348,25 @@ class MainActivity : AppCompatActivity() {
     private fun syncIssuedBooksCacheIfNeeded() {
         val cached = IssuedBooksCache.cached(this)
 
-        // My Books performs the first fetch when no local record exists.
-        // Once a record exists, only the daily 5 PM IST check may fetch here.
-        if (cached != null && IssuedBooksCache.shouldDailyFetch(this)) {
+        if (cached == null) {
+            // First run for this patron: seed the local record once.
+            // After this, normal app opens use the saved record and do not
+            // contact the gateway again until the 5 PM IST daily refresh.
+            IssuedBooksCache.fetch(
+                this,
+                IssuedBooksCache.isAfterFivePmIst()
+            ) { ok, items ->
+                runOnUiThread {
+                    if (ok) {
+                        DueDateNotificationScheduler.sync(this, items)
+                    }
+                }
+            }
+            return
+        }
+
+        if (IssuedBooksCache.shouldDailyFetch(this)) {
+            // The first app open at/after 5 PM IST performs today's refresh.
             IssuedBooksCache.fetch(this, true) { ok, items ->
                 if (ok) {
                     DueDateNotificationScheduler.sync(this, items)
@@ -1358,7 +1374,8 @@ class MainActivity : AppCompatActivity() {
                     DueDateNotificationScheduler.sync(this, cached)
                 }
             }
-        } else if (cached != null) {
+        } else {
+            // Before 5 PM, use only the locally stored issued-book record.
             DueDateNotificationScheduler.sync(this, cached)
         }
     }
