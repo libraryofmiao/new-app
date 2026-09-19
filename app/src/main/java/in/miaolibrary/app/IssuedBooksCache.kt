@@ -65,8 +65,14 @@ object IssuedBooksCache {
                 connection = (URL(GATEWAY + "/my-books").openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 15000
-                    readTimeout = 20000
+                    readTimeout = 30000
+                    useCaches = false
+                    instanceFollowRedirects = true
                     setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Cache-Control", "no-cache")
+                    setRequestProperty("Pragma", "no-cache")
+                    setRequestProperty("Connection", "close")
+                    setRequestProperty("User-Agent", "Miao-Library-Android/1.0")
                     setRequestProperty("Authorization", "Bearer $access")
                 }
 
