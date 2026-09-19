@@ -29,7 +29,7 @@ struct LoginView: View {
                 }
                 if !error.isEmpty { Text(error).font(.footnote).foregroundStyle(.red) }
                 Button {
-                    busy = true; Task { defer { busy = false }; do { try await session.login(username: username.trimmingCharacters(in: .whitespacesAndNewlines), password: password) } catch { error = "Login failed. Please check your credentials." } }
+                    busy = true; Task { defer { busy = false }; do { try await session.login(username: username.trimmingCharacters(in: .whitespacesAndNewlines), password: password) } catch _ { self.error = "Login failed. Please check your credentials." } }
                 } label: { Text(busy ? "Signing in…" : "Sign in").frame(maxWidth: .infinity).padding(.vertical, 14) }
                 .buttonStyle(.borderedProminent).controlSize(.large).disabled(busy || username.isEmpty || password.isEmpty)
                 Spacer()
@@ -87,7 +87,7 @@ struct HomeView: View {
             ScreenBackground {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text("Welcome back, \(firstName)").font(.system(size: 25, weight: .bold, design: .rounded)).foregroundStyle(navy)
+                        Text(welcomeText).font(.system(size: 25, weight: .bold, design: .rounded)).foregroundStyle(navy)
                         MemberCard()
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Library Announcements").font(.headline).foregroundStyle(navy)
@@ -99,7 +99,7 @@ struct HomeView: View {
             }.navigationTitle("Miao Library").navigationBarTitleDisplayMode(.inline)
         }
     }
-    private var firstName: String { session.member?.name.split(separator: " ").first.map(String.init) ?? session.username }
+    private var welcomeText: String {\n        let name = session.member?.name.split(separator: " ").first.map(String.init) ?? session.username\n        return "Welcome back, " + name\n    }
 }
 
 struct BooksView: View {
