@@ -15,3 +15,5 @@ jobs:
       - name: Build iOS application
         run: |
           xcodebuild -project ios/MiaoLibrary/MiaoLibrary.xcodeproj -scheme MiaoLibrary -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+
+# iOS build trigger
