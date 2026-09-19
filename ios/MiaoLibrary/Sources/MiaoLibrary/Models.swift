@@ -11,11 +11,11 @@ struct Book: Identifiable, Codable, Hashable {
     let library: String?
     let availability: String?
     init(json: [String: Any]) {
-        id = String(json["issue_id"] ?? json["itemnumber"] ?? json["barcode"] ?? UUID().uuidString)
-        title = String(json["title"] ?? json["name"] ?? "Untitled")
-        author = String(json["author"] ?? "")
-        dueDate = String(json["date_due"] ?? json["due_date"] ?? json["due"] ?? "")
-        checkoutDate = String(json["issuedate"] ?? json["checkout_date"] ?? json["date_issued"] ?? "")
+        id = String(describing: json["issue_id"] ?? json["itemnumber"] ?? json["barcode"] ?? UUID().uuidString)
+        title = String(describing: json["title"] ?? json["name"] ?? "Untitled")
+        author = String(describing: json["author"] ?? "")
+        dueDate = String(describing: json["date_due"] ?? json["due_date"] ?? json["due"] ?? "")
+        checkoutDate = String(describing: json["issuedate"] ?? json["checkout_date"] ?? json["date_issued"] ?? "")
         biblionumber = (json["biblionumber"] as? CustomStringConvertible)?.description
         library = (json["library"] as? CustomStringConvertible)?.description
         availability = (json["availability"] as? CustomStringConvertible)?.description
