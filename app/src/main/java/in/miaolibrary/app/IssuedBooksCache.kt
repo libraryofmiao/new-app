@@ -16,15 +16,29 @@ import org.json.JSONObject
 
 object IssuedBooksCache {
     private const val PREFS = "session"
-    private const val CACHE = "issued_books_cache"
-    private const val DAILY_FETCH_DATE = "issued_books_daily_fetch_date"
+    private const val CACHE_PREFIX = "issued_books_cache_"
+    private const val DAILY_FETCH_DATE_PREFIX = "issued_books_daily_fetch_date_"
     private const val REQUEST_CODE = 845217
     private const val GATEWAY = "https://api.miaolibrary.in"
 
+    private fun patronKey(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val info = prefs.getString("member_info", null)
+        return try {
+            val card = JSONObject(info ?: "").optString("card_number").trim()
+            if (card.isNotBlank()) card else prefs.getString("username", "default") ?: "default"
+        } catch (_: Exception) {
+            prefs.getString("username", "default") ?: "default"
+        }
+    }
+
+    private fun cacheKey(context: Context) = CACHE_PREFIX + patronKey(context)
+    private fun dailyFetchKey(context: Context) = DAILY_FETCH_DATE_PREFIX + patronKey(context)
+
     fun cached(context: Context): JSONArray? {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(CACHE, null) ?: return null
-        return extractBooks(raw)
+            .getString(cacheKey(context), null) ?: return null
+        return try { JSONArray(raw) } catch (_: Exception) { null }
     }
 
     fun hasCache(context: Context): Boolean = cached(context) != null
@@ -43,7 +57,7 @@ object IssuedBooksCache {
         if (!isAfterFivePmIst()) return false
         val today = dateKey(now)
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(DAILY_FETCH_DATE, "") != today
+            .getString(dailyFetchKey(context), "") != today
     }
 
     fun fetch(
@@ -90,14 +104,11 @@ object IssuedBooksCache {
                 // Replace the local issued-book record only after a successful
                 // gateway fetch. The previous record remains untouched on failure.
                 val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                val oldResponse = preferences.getString(CACHE, null)
-                if (oldResponse != response) {
-                    // Successful data changed: replace the complete local
-                    // issued-book record with the newly fetched record.
-                    preferences.edit()
-                        .putString(CACHE, response)
-                        .apply()
-                }
+                // Store the extracted issued-book array itself, not the gateway envelope.
+                // This makes the local record stable and immediately reusable.
+                preferences.edit()
+                    .putString(cacheKey(context), books.toString())
+                    .commit()
 
                 if (markDailyFetch) {
                     val now = Calendar.getInstance().apply {
@@ -105,7 +116,7 @@ object IssuedBooksCache {
                     }
                     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                         .edit()
-                        .putString(DAILY_FETCH_DATE, dateKey(now))
+                        .putString(dailyFetchKey(context), dateKey(now))
                         .apply()
                 }
 
