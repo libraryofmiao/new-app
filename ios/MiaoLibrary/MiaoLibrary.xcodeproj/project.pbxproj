@@ -1,0 +1,2 @@
+// Xcode project generated for the isolated Miao Library iOS target.
+// The project intentionally contains only ios/MiaoLibrary sources and does not reference Android files.
