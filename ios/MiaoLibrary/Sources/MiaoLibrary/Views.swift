@@ -99,7 +99,10 @@ struct HomeView: View {
             }.navigationTitle("Miao Library").navigationBarTitleDisplayMode(.inline)
         }
     }
-    private var welcomeText: String {\n        let name = session.member?.name.split(separator: " ").first.map(String.init) ?? session.username\n        return "Welcome back, " + name\n    }
+    private var welcomeText: String {
+        let name = session.member?.name.split(separator: " ").first.map(String.init) ?? session.username
+        return "Welcome back, " + name
+    }
 }
 
 struct BooksView: View {
