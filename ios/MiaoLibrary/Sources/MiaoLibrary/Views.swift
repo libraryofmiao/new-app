@@ -107,41 +107,96 @@ struct HomeView: View {
 
 struct BooksView: View {
     @EnvironmentObject var session: SessionStore
-    @State private var history: [[String: Any]] = []; @State private var loadingHistory = false
+    @State private var history: [[String: Any]] = []
+    @State private var loadingHistory = false
+
     var body: some View {
         NavigationStack {
             ScreenBackground {
                 ScrollView {
-                    LazyVStack(spacing: 12) {
-                        if session.books.isEmpty {
-                            EmptyState(title: "No books currently issued", icon: "books.vertical")
-                        } else {
-                            ForEach(session.books) { book in BookRow(book: book) }
-                        }
-                        Button { Task { await session.syncIssuedBooks(force: true) } } label: { Label("Refresh issued books", systemImage: "arrow.clockwise") }
-                            .buttonStyle(.bordered).padding(.top, 4)
+                    VStack(spacing: 12) {
+                        currentBooksSection
+                        refreshButton
                         Divider().padding(.vertical, 8)
-                        HStack {
-                            Text("Previous Issues").font(.headline).foregroundStyle(navy)
-                            Spacer()
-                            Button(loadingHistory ? "Loading…" : "Load") {
-                                guard let token = session.token else { return }; loadingHistory = true
-                                Task { defer { loadingHistory = false }; history = (try? await Gateway.history(token: token)) ?? [] }
-                            }.font(.subheadline.weight(.semibold))
-                        }
-                        if history.isEmpty && !loadingHistory {
-                            Text("Tap Load to view previous issues.").font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            ForEach(Array(history.enumerated()), id: \.offset) { _, item in
-                                Text(String(item["title"] ?? item["name"] ?? "Untitled")).frame(maxWidth: .infinity, alignment: .leading).padding(14).background(card).clipShape(RoundedRectangle(cornerRadius: 14))
-                            }
-                        }
-                    }.padding(18)
+                        historySection
+                    }
+                    .padding(18)
                 }
-            }.navigationTitle("My Books").navigationBarTitleDisplayMode(.inline)
+            }
+            .navigationTitle("My Books")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
+
+    @ViewBuilder
+    private var currentBooksSection: some View {
+        if session.books.isEmpty {
+            EmptyState(title: "No books currently issued", icon: "books.vertical")
+        } else {
+            ForEach(session.books) { book in
+                BookRow(book: book)
+            }
+        }
+    }
+
+    private var refreshButton: some View {
+        Button {
+            Task { await session.syncIssuedBooks(force: true) }
+        } label: {
+            Label("Refresh issued books", systemImage: "arrow.clockwise")
+        }
+        .buttonStyle(.bordered)
+        .padding(.top, 4)
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Previous Issues")
+                    .font(.headline)
+                    .foregroundStyle(navy)
+                Spacer()
+                Button(loadingHistory ? "Loading…" : "Load") {
+                    loadHistory()
+                }
+                .font(.subheadline.weight(.semibold))
+            }
+
+            if history.isEmpty && !loadingHistory {
+                Text("Tap Load to view previous issues.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(history.enumerated()), id: \.offset) { _, item in
+                    Text(historyTitle(item))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+            }
+        }
+    }
+
+    private func loadHistory() {
+        guard let token = session.token else { return }
+        loadingHistory = true
+        Task {
+            let result = (try? await Gateway.history(token: token)) ?? []
+            await MainActor.run {
+                history = result
+                loadingHistory = false
+            }
+        }
+    }
+
+    private func historyTitle(_ item: [String: Any]) -> String {
+        if let title = item["title"] as? String { return title }
+        if let name = item["name"] as? String { return name }
+        return "Untitled"
+    }
 }
+
 struct BookRow: View {
     let book: Book
     var body: some View {
