@@ -20,6 +20,7 @@ jobs:
           plutil -lint ios/MiaoLibrary/Config/Info.plist
           echo '--- XCODE PROJECT LIST ---'
           xcodebuild -project ios/MiaoLibrary/MiaoLibrary.xcodeproj -list
+          test -f ios/MiaoLibrary/MiaoLibrary.xcodeproj/xcshareddata/xcschemes/MiaoLibrary.xcscheme
           echo '--- BUILD ---'
           xcodebuild -project ios/MiaoLibrary/MiaoLibrary.xcodeproj -scheme MiaoLibrary -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
 
